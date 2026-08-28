@@ -94,7 +94,7 @@ function boot(): void {
   function postToFrame(): void {
     if (!frame?.contentWindow || !session) return;
     frame.contentWindow.postMessage(
-      { type: "platform:session", session },
+      { type: "platform:session", session, apiBase: settings!.apiBase },
       settings!.chatOrigin
     );
   }

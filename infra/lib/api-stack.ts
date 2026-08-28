@@ -15,6 +15,7 @@ import { ApiGatewayv2DomainProperties } from "aws-cdk-lib/aws-route53-targets";
 import type { Table } from "aws-cdk-lib/aws-dynamodb";
 import { Key, KeySpec, KeyUsage } from "aws-cdk-lib/aws-kms";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { nodeHandler } from "./lambda.js";
 import { tenantPk } from "@platform/shared";
 import type { PlatformConfig } from "./config.js";
@@ -113,6 +114,55 @@ export class ApiStack extends Stack {
       path: "/v1/widget/session",
       methods: [HttpMethod.POST, HttpMethod.OPTIONS],
       integration: new HttpLambdaIntegration("SessionIntegration", session)
+    });
+
+    // MODEL_API_KEY is supplied at deploy time via secret material — never in
+    // code or CloudFormation template. Import by name; CDK grants read only.
+    const modelKeySecret = Secret.fromSecretNameV2(
+      this,
+      "ModelApiKeySecret",
+      `platform-${config.env}/model-api-key`
+    );
+
+    const chat = nodeHandler(this, "ChatFn", {
+      handlerFile: "chat.ts",
+      memorySize: 1024,
+      environment: {
+        ENV: config.env,
+        TABLE_NAME: table.tableName,
+        JWT_KMS_KEY_ID: jwtKey.keyId,
+        MODEL_API_KEY_SECRET_ARN: modelKeySecret.secretArn
+      }
+    });
+
+    // All chat data lives under TENANT#-prefixed partitions: config/products/
+    // usage at TENANT#<id>, and message history at TENANT#<id>#SESSION#<sid>.
+    // The LeadingKeys condition therefore bounds the handler to tenant
+    // partitions; app code binds session→tenant from the JWT claims.
+    chat.addToRolePolicy(
+      new PolicyStatement({
+        actions: [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+          "dynamodb:BatchWriteItem",
+          "dynamodb:UpdateItem"
+        ],
+        resources: [table.tableArn],
+        conditions: {
+          "ForAllValues:StringLike": {
+            "dynamodb:LeadingKeys": ["TENANT#*"]
+          }
+        }
+      })
+    );
+    jwtKey.grant(chat, "kms:GetPublicKey");
+    modelKeySecret.grantRead(chat);
+
+    this.httpApi.addRoutes({
+      path: "/v1/chat/message",
+      methods: [HttpMethod.POST, HttpMethod.OPTIONS],
+      integration: new HttpLambdaIntegration("ChatIntegration", chat)
     });
 
     new ARecord(this, "ApiAliasRecord", {

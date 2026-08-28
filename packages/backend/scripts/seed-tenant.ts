@@ -1,7 +1,18 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { tenantPk, configSk, siteKeyGsi } from "@platform/shared";
+import {
+  DynamoDBDocumentClient,
+  PutCommand,
+  BatchWriteCommand
+} from "@aws-sdk/lib-dynamodb";
+import { tenantPk, configSk, siteKeyGsi, productSk } from "@platform/shared";
 import { hashSiteKey } from "@platform/shared/node";
+
+const PRODUCTS = [
+  { productId: "p1", name: "Blue T-Shirt", price: 19, available: true },
+  { productId: "p2", name: "Red Hoodie", price: 39, available: true },
+  { productId: "p3", name: "Green Cap", price: 12, available: true },
+  { productId: "p4", name: "Black Jeans", price: 49, available: false }
+];
 
 const TABLE = process.env.TABLE_NAME ?? "platform-dev";
 const TENANT_ID = process.env.SEED_TENANT_ID ?? "t_dev";
@@ -25,6 +36,11 @@ async function main(): Promise<void> {
         siteKeyHash,
         allowedOrigins: ORIGINS,
         status: "active",
+        killSwitch: false,
+        model: "claude-haiku-4-5",
+        systemPrompt:
+          "You are a helpful store assistant. Use search_products to " +
+          "answer product questions. Answer concisely.",
         branding: {
           displayName: "Dev Bot",
           greeting: "Hi! How can I help?",
@@ -33,9 +49,23 @@ async function main(): Promise<void> {
       }
     })
   );
+
+  await client.send(
+    new BatchWriteCommand({
+      RequestItems: {
+        [TABLE]: PRODUCTS.map((p) => ({
+          PutRequest: {
+            Item: { PK: tenantPk(TENANT_ID), SK: productSk(p.productId), ...p }
+          }
+        }))
+      }
+    })
+  );
+
   console.log(
     `Seeded tenant ${TENANT_ID} into ${TABLE}. Site key: ${SITE_KEY}`
   );
+  console.log(`Seeded ${PRODUCTS.length} products.`);
   console.log(`Allowed origins: ${ORIGINS.join(", ")}`);
 }
 

@@ -9,8 +9,10 @@
     "seed": "tsx scripts/seed-tenant.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
     "@aws-sdk/client-dynamodb": "^3.717.0",
     "@aws-sdk/client-kms": "^3.717.0",
+    "@aws-sdk/client-secrets-manager": "^3.717.0",
     "@aws-sdk/lib-dynamodb": "^3.717.0",
     "@aws-sdk/util-dynamodb": "^3.717.0",
     "@platform/shared": "workspace:*",

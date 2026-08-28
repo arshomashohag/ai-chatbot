@@ -16,3 +16,19 @@ export function siteKeyGsi(siteKeyHash: string): {
 } {
   return { GSI1PK: `SITEKEY#${siteKeyHash}`, GSI1SK: "TENANT" };
 }
+
+export function sessionPk(tenantId: string, sessionId: string): string {
+  return `TENANT#${tenantId}#SESSION#${sessionId}`;
+}
+
+export function messageSk(isoTs: string, id: string): string {
+  return `MSG#${isoTs}#${id}`;
+}
+
+export function productSk(productId: string): string {
+  return `PRODUCT#${productId}`;
+}
+
+export function usageSk(month: string): string {
+  return `USAGE#${month}`;
+}

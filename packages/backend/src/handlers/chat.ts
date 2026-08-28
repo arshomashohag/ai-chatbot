@@ -1,0 +1,99 @@
+import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
+import {
+  ChatMessageRequest,
+  ChatMessageResponse
+} from "@platform/shared";
+import { json, error } from "../lib/http.js";
+import { verifyWidgetJwt, JwtError } from "../lib/jwt-verify.js";
+import { cachedTenantConfig } from "../lib/config-cache.js";
+import { queryHistory, persistMessages, incrementUsage } from "../lib/ddb.js";
+import { AnthropicAdapter } from "../lib/adapter/anthropic.js";
+import { modelApiKey } from "../lib/secrets.js";
+import { runChat } from "../lib/chat-engine.js";
+
+const FRIENDLY_DEGRADE =
+  "Sorry, I'm having trouble right now. Please try again in a moment.";
+
+function bearer(event: { headers?: Record<string, string | undefined> }) {
+  const raw =
+    event.headers?.authorization ?? event.headers?.Authorization ?? "";
+  return raw.startsWith("Bearer ") ? raw.slice(7) : "";
+}
+
+export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+  const keyId = process.env.JWT_KMS_KEY_ID;
+  if (!keyId) throw new Error("JWT_KMS_KEY_ID is required");
+
+  const token = bearer(event);
+  let claims;
+  try {
+    claims = await verifyWidgetJwt(token, keyId);
+  } catch (e) {
+    if (e instanceof JwtError) {
+      return error(401, "unauthorized", "Invalid or expired session");
+    }
+    throw e;
+  }
+
+  const parsed = ChatMessageRequest.safeParse(
+    JSON.parse(event.body ?? "{}")
+  );
+  if (!parsed.success) {
+    return error(400, "invalid_request", "Invalid request");
+  }
+
+  const config = await cachedTenantConfig(claims.tenant_id);
+  if (!config || config.status === "suspended" || config.killSwitch) {
+    return error(503, "unavailable", "Chat is temporarily unavailable");
+  }
+
+  const history = await queryHistory(claims.tenant_id, claims.session_id);
+
+  let result;
+  try {
+    const adapter = new AnthropicAdapter({
+      apiKey: await modelApiKey(),
+      model: config.model,
+      systemPrompt: config.systemPrompt
+    });
+    result = await runChat({
+      tenantId: claims.tenant_id,
+      adapter,
+      history,
+      userMessage: parsed.data.message
+    });
+  } catch (e) {
+    console.error(
+      JSON.stringify({
+        event: "chat_degraded",
+        tenant: claims.tenant_id,
+        session: claims.session_id,
+        error: e instanceof Error ? e.message : "unknown"
+      })
+    );
+    return json(200, {
+      reply: FRIENDLY_DEGRADE,
+      sessionId: claims.session_id
+    });
+  }
+
+  const baseIso = new Date().toISOString();
+  await persistMessages({
+    tenantId: claims.tenant_id,
+    sessionId: claims.session_id,
+    baseIso,
+    messages: result.newMessages
+  });
+  await incrementUsage({
+    tenantId: claims.tenant_id,
+    month: baseIso.slice(0, 7),
+    tokensIn: result.tokensIn,
+    tokensOut: result.tokensOut
+  });
+
+  const body: ChatMessageResponse = {
+    reply: result.reply,
+    sessionId: claims.session_id
+  };
+  return json(200, ChatMessageResponse.parse(body));
+};
