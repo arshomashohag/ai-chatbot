@@ -50,3 +50,28 @@ jobs:
           # Stub zone id so synth uses fromHostedZoneAttributes (no AWS creds/network).
           HOSTED_ZONE_ID: ${{ vars.HOSTED_ZONE_ID_DEV || 'ZSYNTHSTUB0000' }}
         run: pnpm synth
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build widget
+        run: pnpm --filter @platform/widget build
+
+      - name: Install Playwright browser
+        run: pnpm --filter @platform/e2e exec playwright install --with-deps chromium
+
+      - name: Widget handshake E2E
+        run: pnpm --filter @platform/e2e test

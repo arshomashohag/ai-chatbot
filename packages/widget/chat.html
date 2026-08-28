@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chat</title>
+    <style>
+      body { margin: 0; font: 14px system-ui; background: #fff; color: #111; }
+      #root { display: flex; flex-direction: column; height: 100vh; }
+      #header { padding: 16px; font-weight: 600; border-bottom: 1px solid #eee; }
+      #status { padding: 16px; color: #444; }
+      #root[data-state="unavailable"] #status { color: #a00; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-state="loading">
+      <div id="header">Chat</div>
+      <div id="status">Connecting…</div>
+    </div>
+    <script type="module" src="/src/chat/main.ts"></script>
+  </body>
+</html>

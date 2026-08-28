@@ -13,7 +13,10 @@ import {
 import { HostedZone, ARecord, RecordTarget } from "aws-cdk-lib/aws-route53";
 import { ApiGatewayv2DomainProperties } from "aws-cdk-lib/aws-route53-targets";
 import type { Table } from "aws-cdk-lib/aws-dynamodb";
+import { Key, KeySpec, KeyUsage } from "aws-cdk-lib/aws-kms";
+import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { nodeHandler } from "./lambda.js";
+import { tenantPk } from "@platform/shared";
 import type { PlatformConfig } from "./config.js";
 
 export interface ApiStackProps extends StackProps {
@@ -65,6 +68,51 @@ export class ApiStack extends Stack {
       path: "/health",
       methods: [HttpMethod.GET],
       integration: new HttpLambdaIntegration("HealthIntegration", health)
+    });
+
+    const jwtKey = new Key(this, "WidgetJwtKey", {
+      keySpec: KeySpec.ECC_NIST_P256,
+      keyUsage: KeyUsage.SIGN_VERIFY,
+      alias: `platform-${config.env}-widget-jwt`
+    });
+
+    const session = nodeHandler(this, "SessionFn", {
+      handlerFile: "session.ts",
+      environment: {
+        ENV: config.env,
+        TABLE_NAME: table.tableName,
+        JWT_KMS_KEY_ID: jwtKey.keyId
+      }
+    });
+
+    // Base-table item access is restricted to TENANT#-prefixed partitions.
+    // This bounds the shared handler to tenant data (not a per-tenant guard —
+    // cross-tenant isolation is enforced in app code via the site-key GSI
+    // lookup that derives tenantId server-side). Per-tenant IAM would require
+    // request-scoped credentials (revisit in a later phase).
+    session.addToRolePolicy(
+      new PolicyStatement({
+        actions: ["dynamodb:GetItem", "dynamodb:PutItem"],
+        resources: [table.tableArn],
+        conditions: {
+          "ForAllValues:StringLike": {
+            "dynamodb:LeadingKeys": [`${tenantPk("*")}`]
+          }
+        }
+      })
+    );
+    session.addToRolePolicy(
+      new PolicyStatement({
+        actions: ["dynamodb:Query"],
+        resources: [`${table.tableArn}/index/GSI1`]
+      })
+    );
+    jwtKey.grant(session, "kms:Sign");
+
+    this.httpApi.addRoutes({
+      path: "/v1/widget/session",
+      methods: [HttpMethod.POST, HttpMethod.OPTIONS],
+      integration: new HttpLambdaIntegration("SessionIntegration", session)
     });
 
     new ARecord(this, "ApiAliasRecord", {

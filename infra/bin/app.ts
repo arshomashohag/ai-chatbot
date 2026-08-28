@@ -2,6 +2,7 @@ import { App } from "aws-cdk-lib";
 import { loadConfig } from "../lib/config.js";
 import { DataStack } from "../lib/data-stack.js";
 import { ApiStack } from "../lib/api-stack.js";
+import { EdgeStack } from "../lib/edge-stack.js";
 
 const app = new App();
 const config = loadConfig();
@@ -25,3 +26,8 @@ const api = new ApiStack(app, `${prefix}-Api`, {
 });
 
 api.addDependency(data);
+
+new EdgeStack(app, `${prefix}-Edge`, {
+  env: cdkEnv,
+  config
+});

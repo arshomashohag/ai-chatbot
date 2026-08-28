@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-chat/
 cdk.out/
 coverage/
 *.log
