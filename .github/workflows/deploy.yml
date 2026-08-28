@@ -110,14 +110,26 @@ jobs:
           VITE_USER_POOL_CLIENT_ID="$USER_POOL_CLIENT_ID" \
             pnpm --filter @platform/dashboard build
 
-      - name: Sync static assets to S3
+      - name: Sync static assets and invalidate CloudFront
         env:
           ENV: ${{ inputs.env }}
         run: |
           stack="ChatbotPlatform-${ENV}-Edge"
           get() { aws cloudformation describe-stacks --stack-name "$stack" \
             --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+
           aws s3 sync packages/widget/dist      "s3://$(get WidgetBucketName)"    --delete
           aws s3 sync packages/widget/dist-chat "s3://$(get ChatBucketName)"      --delete
           aws s3 sync packages/marketing/dist   "s3://$(get MarketingBucketName)" --delete
           aws s3 sync packages/dashboard/dist   "s3://$(get PortalBucketName)"    --delete
+
+          # Invalidate each distribution so CloudFront serves the freshly synced
+          # assets immediately instead of cached copies. Distribution ids come
+          # from the Edge stack outputs — nothing hardcoded.
+          for out in CdnDistributionId ChatDistributionId \
+                     MarketingDistributionId PortalDistributionId; do
+            dist="$(get "$out")"
+            echo "Invalidating $out → $dist"
+            aws cloudfront create-invalidation \
+              --distribution-id "$dist" --paths '/*' >/dev/null
+          done

@@ -65,7 +65,7 @@ export class EdgeStack extends Stack {
     );
     this.portalBucket = this.privateBucket("PortalBucket", config.env, "portal");
 
-    this.makeDistribution({
+    const cdnDist = this.makeDistribution({
       id: "CdnDistribution",
       zone,
       domain: config.subdomains.cdn,
@@ -74,7 +74,7 @@ export class EdgeStack extends Stack {
       webAclId: cdnWaf.attrArn,
       rootObject: "widget.js"
     });
-    this.makeDistribution({
+    const chatDist = this.makeDistribution({
       id: "ChatDistribution",
       zone,
       domain: config.subdomains.chat,
@@ -83,7 +83,7 @@ export class EdgeStack extends Stack {
       webAclId: cdnWaf.attrArn,
       rootObject: "chat.html"
     });
-    this.makeDistribution({
+    const marketingDist = this.makeDistribution({
       id: "MarketingDistribution",
       zone,
       domain: config.subdomains.site,
@@ -93,7 +93,7 @@ export class EdgeStack extends Stack {
       rootObject: "index.html",
       spa: true
     });
-    this.makeDistribution({
+    const portalDist = this.makeDistribution({
       id: "PortalDistribution",
       zone,
       domain: config.subdomains.app,
@@ -108,6 +108,17 @@ export class EdgeStack extends Stack {
     new CfnOutput(this, "ChatBucketName", { value: this.chatBucket.bucketName });
     new CfnOutput(this, "MarketingBucketName", { value: this.marketingBucket.bucketName });
     new CfnOutput(this, "PortalBucketName", { value: this.portalBucket.bucketName });
+
+    // Distribution ids — the deploy pipeline invalidates these after syncing
+    // new assets so CloudFront serves fresh content instead of cached copies.
+    new CfnOutput(this, "CdnDistributionId", { value: cdnDist.distributionId });
+    new CfnOutput(this, "ChatDistributionId", { value: chatDist.distributionId });
+    new CfnOutput(this, "MarketingDistributionId", {
+      value: marketingDist.distributionId
+    });
+    new CfnOutput(this, "PortalDistributionId", {
+      value: portalDist.distributionId
+    });
 
     // Public origins — the single source of truth for frontend builds. The
     // deploy pipeline reads these instead of re-deriving subdomain strings.
