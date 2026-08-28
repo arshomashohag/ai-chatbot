@@ -23,6 +23,40 @@ agnostic model adapter (Claude Haiku primary).
 - A Route 53 **hosted zone** for your domain in each AWS account (CDK imports it)
 - CDK bootstrapped in each account/region (`cdk bootstrap`)
 
+## One-time AWS setup (per environment)
+
+Run these once per account, with admin credentials. Everything after this is
+OIDC-based — no long-lived AWS keys.
+
+```bash
+# 1. Bootstrap CDK (creates the cdk-* roles the deploy role assumes).
+pnpm --filter @platform/infra exec cdk bootstrap aws://<ACCOUNT_ID>/us-east-1
+
+# 2. Create the GitHub OIDC provider + deploy role from the bundled template.
+#    Set CreateOidcProvider=false if the provider already exists in the account.
+aws cloudformation deploy \
+  --template-file infra/bootstrap/github-deploy-role.yaml \
+  --stack-name chatbot-github-deploy-dev \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides EnvName=dev GitHubOrg=arshomashohag GitHubRepo=ai-chatbot
+
+# 3. Copy the DeployRoleArn output into the GitHub secret AWS_DEPLOY_ROLE_DEV.
+aws cloudformation describe-stacks --stack-name chatbot-github-deploy-dev \
+  --query "Stacks[0].Outputs[?OutputKey=='DeployRoleArn'].OutputValue" --output text
+
+# 4. Store the model API key (never a GitHub secret).
+aws secretsmanager create-secret --name platform-dev/model-api-key \
+  --secret-string "<your-anthropic-key>"
+```
+
+Repeat with `EnvName=staging` / `prod` (and their accounts). For the second and
+third runs in the **same** account, add `CreateOidcProvider=false` — only one
+GitHub OIDC provider is allowed per account.
+
+The deploy role uses least privilege: it assumes the CDK bootstrap roles to
+create resources (so it needs no broad service permissions of its own), reads
+stack outputs, and writes to the `platform-<env>-*-<account>` asset buckets.
+
 ## Local dev
 
 ```bash

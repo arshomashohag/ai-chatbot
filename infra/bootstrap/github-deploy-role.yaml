@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  GitHub OIDC provider + a per-environment deploy role for the chatbot
+  platform. The role assumes the CDK bootstrap roles (created by
+  `cdk bootstrap`) to deploy the stacks, and can sync built assets to the
+  platform S3 buckets. No long-lived AWS keys are involved.
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Default: arshomashohag
+    Description: GitHub org/user that owns the repo.
+  GitHubRepo:
+    Type: String
+    Default: ai-chatbot
+    Description: Repository name.
+  EnvName:
+    Type: String
+    AllowedValues: [dev, staging, prod]
+    Description: Which environment this role deploys.
+  SubjectClaim:
+    Type: String
+    Default: ""
+    Description: >
+      Optional override for the OIDC `sub` this role trusts. Leave blank to
+      use a sensible default per env (dev/staging = pushes to main, prod =
+      the `prod` GitHub environment).
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+    Description: >
+      Set to "false" if the token.actions.githubusercontent.com OIDC
+      provider already exists in this account (only one is allowed).
+
+Conditions:
+  ShouldCreateOidc: !Equals [!Ref CreateOidcProvider, "true"]
+  HasCustomSubject: !Not [!Equals [!Ref SubjectClaim, ""]]
+  IsProd: !Equals [!Ref EnvName, "prod"]
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOidc
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bba010962f293b7c1f4ba0f6fdf9c7
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub GitHubDeployRole-${EnvName}
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - ShouldCreateOidc
+                - !Ref GitHubOidcProvider
+                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !If
+                  - HasCustomSubject
+                  - !Ref SubjectClaim
+                  - !If
+                    - IsProd
+                    - !Sub repo:${GitHubOrg}/${GitHubRepo}:environment:prod
+                    - !Sub repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/main
+      Policies:
+        - PolicyName: cdk-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Assume the CDK bootstrap roles that actually create resources.
+              - Sid: AssumeCdkRoles
+                Effect: Allow
+                Action: sts:AssumeRole
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-*
+              # Read stack outputs (bucket names) for the asset-sync step.
+              - Sid: ReadStacks
+                Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                Resource: !Sub arn:${AWS::Partition}:cloudformation:*:${AWS::AccountId}:stack/Platform-${EnvName}-*/*
+              # Sync built widget/chat/marketing/portal assets to the buckets.
+              # Bucket names are platform-<env>-<role>-<account> (set in CDK).
+              - Sid: SyncAssets
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::platform-${EnvName}-*-${AWS::AccountId}
+                  - !Sub arn:${AWS::Partition}:s3:::platform-${EnvName}-*-${AWS::AccountId}/*
+              # Invalidate the widget pointer after a widget release.
+              - Sid: Invalidate
+                Effect: Allow
+                Action: cloudfront:CreateInvalidation
+                Resource: "*"
+
+Outputs:
+  DeployRoleArn:
+    Description: >
+      Set this as the GitHub Actions secret AWS_DEPLOY_ROLE_<ENV>
+      (e.g. AWS_DEPLOY_ROLE_DEV).
+    Value: !GetAtt DeployRole.Arn

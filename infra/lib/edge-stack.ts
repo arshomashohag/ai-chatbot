@@ -37,8 +37,8 @@ export class EdgeStack extends Stack {
         })
       : HostedZone.fromLookup(this, "Zone", { domainName: config.domainName });
 
-    this.widgetBucket = this.privateBucket("WidgetBucket");
-    this.chatBucket = this.privateBucket("ChatBucket");
+    this.widgetBucket = this.privateBucket("WidgetBucket", config.env, "widget");
+    this.chatBucket = this.privateBucket("ChatBucket", config.env, "chat");
 
     const cdnWaf = makeWebAcl(this, "CdnWaf", "CLOUDFRONT", config.env);
 
@@ -58,8 +58,12 @@ export class EdgeStack extends Stack {
       }
     });
 
-    this.marketingBucket = this.privateBucket("MarketingBucket");
-    this.portalBucket = this.privateBucket("PortalBucket");
+    this.marketingBucket = this.privateBucket(
+      "MarketingBucket",
+      config.env,
+      "marketing"
+    );
+    this.portalBucket = this.privateBucket("PortalBucket", config.env, "portal");
 
     this.makeDistribution({
       id: "CdnDistribution",
@@ -106,8 +110,12 @@ export class EdgeStack extends Stack {
     new CfnOutput(this, "PortalBucketName", { value: this.portalBucket.bucketName });
   }
 
-  private privateBucket(id: string): Bucket {
+  private privateBucket(id: string, env: string, role: string): Bucket {
     return new Bucket(this, id, {
+      // Explicit, predictable name (globally unique via the account id) so the
+      // deploy role's asset-sync IAM can target it and the sync command is
+      // deterministic: platform-<env>-<role>-<account>.
+      bucketName: `platform-${env}-${role}-${this.account}`,
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
       encryption: BucketEncryption.S3_MANAGED,
       versioned: true,

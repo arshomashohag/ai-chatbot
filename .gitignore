@@ -12,3 +12,5 @@ test-results/
 *.tsbuildinfo
 .pnpm-store/
 infra/cdk.context.json
+.aidlc-rule-details/
+.aidlc/
