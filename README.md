@@ -70,16 +70,20 @@ API key is **not** a GitHub secret; it lives in Secrets Manager at
 
 ## Deploy flow
 
+CI runs automatically; **all deploys are manual** (`workflow_dispatch`).
+
 ```
-PR              → ci.yml: lint, typecheck, vitest, isolation suite,
-                  cdk synth, widget size (<=30KB gz), Playwright E2E
-push to main    → deploy-dev.yml (OIDC → cdk deploy --all to dev)
-tag v*          → deploy-staging.yml
-release / manual→ deploy-prod.yml (behind the `prod` GitHub environment)
+PR / push to main → ci.yml: lint, typecheck, vitest, isolation suite,
+                    cdk synth, widget size (<=30KB gz), Playwright E2E
+Actions → Run     → deploy-dev.yml     (OIDC → cdk deploy --all to dev)
+Actions → Run     → deploy-staging.yml
+Actions → Run     → deploy-prod.yml    (behind the `prod` GitHub environment)
 ```
 
-Each deploy assumes the env's OIDC role and passes `DOMAIN_NAME` to CDK. Prod
-is gated by a required-reviewer rule on the `prod` GitHub environment.
+Trigger a deploy from the **Actions** tab → pick the workflow → **Run
+workflow**. Each deploy assumes the env's OIDC role and passes `DOMAIN_NAME` to
+CDK. Prod is additionally gated by a required-reviewer rule on the `prod`
+GitHub environment.
 
 ### Static assets
 
