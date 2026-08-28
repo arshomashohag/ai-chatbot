@@ -25,8 +25,8 @@ import {
 const GRACE_SECONDS = 24 * 60 * 60;
 
 function snippet(siteKey: string): string {
-  const cdn = process.env.CDN_ORIGIN ?? "cdn.example.com";
-  const chat = process.env.CHAT_ORIGIN ?? "chat.example.com";
+  const cdn = process.env.CDN_ORIGIN ?? "chatbot-cdn-dev.example.com";
+  const chat = process.env.CHAT_ORIGIN ?? "chatbot-chat-dev.example.com";
   const api = process.env.API_ORIGIN ?? "chatbot-api-dev.example.com";
   return (
     `<script src="https://${cdn}/widget.js" ` +

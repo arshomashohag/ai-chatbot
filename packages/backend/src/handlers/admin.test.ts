@@ -31,8 +31,8 @@ describe("admin handler", () => {
     ddb.reset();
     process.env.TABLE_NAME = "platform-test";
     process.env.ENV = "dev";
-    process.env.CDN_ORIGIN = "cdn.example.com";
-    process.env.CHAT_ORIGIN = "chat.example.com";
+    process.env.CDN_ORIGIN = "chatbot-cdn-dev.example.com";
+    process.env.CHAT_ORIGIN = "chatbot-chat-dev.example.com";
     process.env.API_ORIGIN = "chatbot-api-dev.example.com";
   });
 

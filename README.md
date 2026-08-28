@@ -87,7 +87,7 @@ Set these under **Settings → Secrets and variables → Actions**.
 
 | Name | Purpose |
 |---|---|
-| `DOMAIN_NAME` | Root domain; CDK derives `cdn.`, `chatbot-api-{env}.`, `chat.`, `app.`, `www.` |
+| `DOMAIN_NAME` | Base domain; every subdomain is env-specific: CDK derives `chatbot-{cdn,api,chat,app,www}-{env}.<DOMAIN_NAME>` (the apex is never used) |
 | `HOSTED_ZONE_ID_DEV` | Route 53 zone id for dev (lets CI `cdk synth` skip a live lookup) |
 
 ### Secrets (`secrets.*`)
