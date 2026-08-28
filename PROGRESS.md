@@ -34,7 +34,7 @@ Resolved in P1: widget now imports `@platform/shared` zod schemas (P0 #2); sessi
 
 ## P3 gate
 - Rate limits both axes (DDB atomic fixed-window counter, conditional-update cap): per-session 10/min, per-tenant 600/min, checked before the model call → 429 + retry-after; widget shows a slow-down message.
-- WAF: regional ACL on the HTTP API `$default` stage + CLOUDFRONT ACL on both distributions, each with an IP rate rule (1000/IP) + AWS CommonRuleSet.
+- Edge protection: CLOUDFRONT WAF ACL on all four distributions (IP rate rule 1000/IP + AWS CommonRuleSet) + API Gateway stage throttling (100 rps / 200 burst). (WAFv2 can't attach to an HTTP API, so the API uses stage throttling + the DDB rate limits below rather than a WebACL.)
 - Kill-switch honored ≤60s via the 60s config cache TTL (P2).
 - Structured JSON logs on every chat: tenant, session, model, tokensIn/Out, latencyMs (no message body / token / key).
 - CloudWatch dashboard (p50/p95 latency, invocations/errors, DDB throttles) + alarms (chat error rate, p95 latency, DDB throttles) → SNS topic, all via CDK.

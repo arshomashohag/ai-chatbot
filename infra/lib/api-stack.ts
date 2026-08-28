@@ -3,7 +3,8 @@ import type { Construct } from "constructs";
 import {
   HttpApi,
   HttpMethod,
-  DomainName
+  DomainName,
+  CfnStage
 } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import {
@@ -16,7 +17,6 @@ import type { Table } from "aws-cdk-lib/aws-dynamodb";
 import { Key, KeySpec, KeyUsage } from "aws-cdk-lib/aws-kms";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
-import { CfnWebACLAssociation } from "aws-cdk-lib/aws-wafv2";
 import {
   UserPool,
   UserPoolClient,
@@ -26,7 +26,6 @@ import {
   HttpJwtAuthorizer
 } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { RemovalPolicy } from "aws-cdk-lib";
-import { makeWebAcl } from "./waf.js";
 import type { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { nodeHandler } from "./lambda.js";
 import { tenantPk } from "@platform/shared";
@@ -272,14 +271,17 @@ export class ApiStack extends Stack {
       )
     });
 
-    const webAcl = makeWebAcl(this, "ApiWaf", "REGIONAL", config.env);
-    const stageArn =
-      `arn:aws:apigateway:${this.region}::/apis/` +
-      `${this.httpApi.apiId}/stages/$default`;
-    new CfnWebACLAssociation(this, "ApiWafAssoc", {
-      resourceArn: stageArn,
-      webAclArn: webAcl.attrArn
-    });
+    // Note: WAFv2 cannot attach to an HTTP API (API Gateway v2) — it only
+    // supports REST APIs, CloudFront, ALB, etc. Edge protection for this API
+    // is provided by stage-level throttling (below) plus the per-session and
+    // per-tenant DDB rate limits in the chat handler. The CloudFront WAF still
+    // guards the widget/chat/marketing/portal surfaces in the Edge stack.
+    const defaultStage = this.httpApi.defaultStage?.node
+      .defaultChild as CfnStage;
+    defaultStage.defaultRouteSettings = {
+      throttlingBurstLimit: 200,
+      throttlingRateLimit: 100
+    };
 
     new CfnOutput(this, "ApiUrl", {
       value: `https://${config.subdomains.api}`

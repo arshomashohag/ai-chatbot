@@ -141,8 +141,8 @@ aws cloudfront create-invalidation --distribution-id <cdn> --paths /widget.js
   never client input; `dynamodb:LeadingKeys` bounds each Lambda to `TENANT#`.
 - **Widget JWTs** are ES256, signed by KMS (private key never leaves the HSM),
   `exp ≤ 60m`, verified against the KMS public key.
-- **Abuse controls**: per-session + per-tenant DDB rate limits, WAF on the API
-  and CDN, a per-tenant kill switch honored within 60s, structured logs, and
-  CloudWatch alarms → SNS.
+- **Abuse controls**: per-session + per-tenant DDB rate limits, CloudFront WAF
+  on the CDN/site distributions, API Gateway stage throttling, a per-tenant
+  kill switch honored within 60s, structured logs, and CloudWatch alarms → SNS.
 
 See `PROGRESS.md` for phase-by-phase status and open TODOs.
