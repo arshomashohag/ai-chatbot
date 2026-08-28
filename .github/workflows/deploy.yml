@@ -92,7 +92,7 @@ jobs:
           ENV: ${{ inputs.env }}
           AWS_REGION: us-east-1
           APP_VERSION: ${{ github.sha }}
-        run: pnpm --filter @platform/infra deploy
+        run: pnpm --filter @platform/infra run deploy
 
       - name: Sync static assets to S3
         env:
