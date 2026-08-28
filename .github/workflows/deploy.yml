@@ -1,0 +1,55 @@
+name: Deploy (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        required: true
+        type: string
+    secrets:
+      AWS_DEPLOY_ROLE:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    concurrency:
+      group: deploy-${{ inputs.env }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build widget
+        run: pnpm --filter @platform/widget build
+
+      - name: Widget size budget
+        run: pnpm widget:size
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE }}
+          aws-region: us-east-1
+
+      - name: CDK deploy
+        env:
+          DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
+          ENV: ${{ inputs.env }}
+          AWS_REGION: us-east-1
+          APP_VERSION: ${{ github.sha }}
+        run: pnpm --filter @platform/infra deploy

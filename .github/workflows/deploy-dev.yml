@@ -1,0 +1,17 @@
+name: Deploy Dev
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-dev:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      env: dev
+    secrets:
+      AWS_DEPLOY_ROLE: ${{ secrets.AWS_DEPLOY_ROLE_DEV }}

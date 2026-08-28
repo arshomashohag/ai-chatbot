@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build widget
+        run: pnpm --filter @platform/widget build
+
+      - name: Widget size budget (<=30KB gz)
+        run: pnpm widget:size
+
+      - name: CDK synth
+        env:
+          DOMAIN_NAME: ${{ vars.DOMAIN_NAME || 'example.com' }}
+          ENV: dev
+          AWS_REGION: us-east-1
+          CDK_DEFAULT_ACCOUNT: "000000000000"
+          # Stub zone id so synth uses fromHostedZoneAttributes (no AWS creds/network).
+          HOSTED_ZONE_ID: ${{ vars.HOSTED_ZONE_ID_DEV || 'ZSYNTHSTUB0000' }}
+        run: pnpm synth

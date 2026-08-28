@@ -1,0 +1,13 @@
+node_modules/
+dist/
+cdk.out/
+coverage/
+*.log
+.env
+.env.*.local
+.DS_Store
+playwright-report/
+test-results/
+*.tsbuildinfo
+.pnpm-store/
+infra/cdk.context.json

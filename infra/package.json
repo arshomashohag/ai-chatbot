@@ -1,0 +1,28 @@
+{
+  "name": "@platform/infra",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "infra": "bin/app.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "synth": "cdk synth --quiet",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy --all --require-approval never"
+  },
+  "dependencies": {
+    "@platform/backend": "workspace:*",
+    "@platform/shared": "workspace:*",
+    "aws-cdk-lib": "^2.173.4",
+    "constructs": "^10.4.2",
+    "esbuild": "^0.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "aws-cdk": "^2.173.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
