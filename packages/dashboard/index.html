@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Portal — Chatbot Platform</title>
+    <style>
+      body { margin: 0; font: 15px system-ui; background: #f7f7f8; color: #111; }
+      main { max-width: 720px; margin: 40px auto; padding: 0 20px; }
+      h1 { font-size: 24px; } h2 { font-size: 18px; margin-top: 32px; }
+      section { background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; margin: 16px 0; }
+      label { display: block; margin: 10px 0 4px; font-weight: 600; font-size: 13px; }
+      input, textarea, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font: inherit; }
+      button { margin-top: 12px; padding: 8px 16px; border: none; border-radius: 6px; background: #111; color: #fff; cursor: pointer; }
+      button.secondary { background: #eee; color: #111; }
+      .err { color: #b00; font-size: 13px; }
+      .ok { color: #060; font-size: 13px; }
+      pre { background: #f0f0f0; padding: 12px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }
+      .kb-item, .sess-item { border-top: 1px solid #eee; padding: 8px 0; }
+      .msg { margin: 4px 0; } .msg.user { font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main id="app"></main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

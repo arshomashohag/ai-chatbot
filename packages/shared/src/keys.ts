@@ -32,3 +32,15 @@ export function productSk(productId: string): string {
 export function usageSk(month: string): string {
   return `USAGE#${month}`;
 }
+
+export function userPk(cognitoSub: string): string {
+  return `USER#${cognitoSub}`;
+}
+
+export function profileSk(): string {
+  return "PROFILE";
+}
+
+export function kbSk(id: string): string {
+  return `KB#${id}`;
+}

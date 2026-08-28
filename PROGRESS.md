@@ -10,7 +10,7 @@ Multi-tenant AI chatbot platform. Phases per `docs/chatbot-platform-implementati
 | P1 | Widget + session auth | ✅ complete |
 | P2 | Chat pipeline + model + one tool | ✅ complete |
 | P3 | Abuse protection | ✅ complete |
-| P4 | Marketing site + tenant portal v1 | ⬜ not started |
+| P4 | Marketing site + tenant portal v1 | ✅ complete |
 
 ## Gate checklist (each phase)
 tests green → reviewer subagent pass → conventional commit → PROGRESS update.
@@ -21,6 +21,16 @@ tests green → reviewer subagent pass → conventional commit → PROGRESS upda
 - [P4] Loader: require `data-api-base` and validate it's absolute; silent fail-closed if a tenant misconfigures. (reviewer P1 #6)
 
 Resolved in P1: widget now imports `@platform/shared` zod schemas (P0 #2); session Lambda DDB grants scoped with `dynamodb:LeadingKeys` (P0 #3).
+
+## P4 gate
+- Marketing static site (`www`): hero/features/CTA, dogfoods its own widget via a demo tenant key (Vite env-injected).
+- Cognito user pool (email verify, SRP-only) + post-confirmation trigger creates USER#/TENANT# records (condition-guarded, no overwrite).
+- Portal SPA (`app`): signup/verify/login, setup wizard (basics+domains → appearance → business profile + FAQ, 50×2KB byte-capped), sessions list + transcript.
+- Admin API (`/v1/admin/{proxy+}`) behind a Cognito JWT authorizer; tenant derived from the `sub` claim server-side, never client input. All admin DDB ops keyed off the server-derived tenantId.
+- Key issuance gated server-side (≥1 domain + profile + ≥1 KB entry); plaintext shown once, SHA-256 stored; rotation keeps the old key alive via a `GRACEKEY#` GSI item with a 24h TTL.
+- KB entries + business profile assembled into the system prompt (static-first for caching, 12KB cap, oldest-first eviction with a `capped` flag).
+- Tests: admin handler (auth, tenant-from-sub, key gate, hash-not-plaintext), prompt assembly, isolation suite extended to admin routes (13 tests total). Playwright money-path: signup→wizard→key→embed→FAQ-grounded answer→transcript.
+- Reviewer: 0 BLOCKER, 3 WARN all fixed (KB byte-cap via TextEncoder, URL-decode+validate path ids, dropped USER_PASSWORD_AUTH).
 
 ## P3 gate
 - Rate limits both axes (DDB atomic fixed-window counter, conditional-update cap): per-session 10/min, per-tenant 600/min, checked before the model call → 429 + retry-after; widget shows a slow-down message.

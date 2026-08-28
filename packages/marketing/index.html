@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chatbot Platform — AI chat for your store</title>
+    <style>
+      :root { --ink: #14110c; --paper: #f4f1ea; --accent: #c05a2e; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 17px/1.6 Georgia, "Times New Roman", serif; color: var(--ink); background: var(--paper); }
+      header, section { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+      .hero h1 { font-size: 52px; line-height: 1.1; margin: 0 0 16px; }
+      .hero p { font-size: 21px; max-width: 620px; color: #4a4438; }
+      .cta { display: inline-block; margin-top: 24px; background: var(--ink); color: var(--paper); padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; }
+      .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 32px; }
+      .feature h3 { margin: 0 0 6px; font-size: 22px; color: var(--accent); }
+      .feature p { margin: 0; color: #4a4438; font-size: 16px; }
+      footer { text-align: center; padding: 32px; color: #6b6357; font-size: 14px; }
+      em { color: var(--accent); font-style: italic; }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <h1>Your store's <em>always-on</em> assistant.</h1>
+      <p>
+        Drop in one line of script and give every visitor a knowledgeable
+        chat assistant grounded in your own products and FAQs. Ask the bot in
+        the corner — it answers questions about this very platform.
+      </p>
+      <a class="cta" href="/app">Get started free</a>
+    </header>
+
+    <section>
+      <div class="features">
+        <div class="feature">
+          <h3>One-line embed</h3>
+          <p>A single script tag renders a chat bubble on any page. No build step, no framework lock-in.</p>
+        </div>
+        <div class="feature">
+          <h3>Grounded answers</h3>
+          <p>Add a business profile and FAQ entries; the assistant answers from them, not from thin air.</p>
+        </div>
+        <div class="feature">
+          <h3>Safe by default</h3>
+          <p>Per-origin site keys, rate limits, and a kill switch keep your bot — and your bill — under control.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer>Built on AWS. © Chatbot Platform.</footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

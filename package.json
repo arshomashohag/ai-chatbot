@@ -7,7 +7,7 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc -b --noEmit || pnpm -r --parallel typecheck",
+    "typecheck": "pnpm -r --parallel typecheck",
     "test": "vitest run",
     "build": "pnpm -r build",
     "synth": "pnpm --filter @platform/infra synth",

@@ -133,3 +133,40 @@ describe("cross-tenant isolation: every access for tenant A stays under TENANT#t
     expect(a.GSI1PK).not.toBe(b.GSI1PK);
   });
 });
+
+describe("admin-route isolation: tenant derived from Cognito sub, KB/sessions tenant-scoped", () => {
+  beforeEach(() => {
+    ddb.reset();
+    process.env.TABLE_NAME = "platform-test";
+    ddb.on(QueryCommand).resolves({ Items: [] });
+    ddb.on(GetCommand).resolves({ Item: undefined });
+    ddb.on(UpdateCommand).resolves({});
+  });
+
+  it("listKb reads only tenant A's KB partition", async () => {
+    const { listKb } = await import("./lib/admin-ddb.js");
+    await listKb(A);
+    const pk = pkOf(ddb.commandCalls(QueryCommand)[0]!.args[0].input);
+    expect(pk).toBe(tenantPk(A));
+    expect(pk).not.toContain(B);
+  });
+
+  it("listSessions and getTranscript stay under tenant A", async () => {
+    const { listSessions, getTranscript } = await import("./lib/admin-ddb.js");
+    await listSessions(A);
+    await getTranscript(A, "sess_owned_by_b");
+    const pks = ddb
+      .commandCalls(QueryCommand)
+      .map((c) => pkOf(c.args[0].input));
+    expect(pks[0]).toBe(tenantPk(A));
+    expect(pks[1]).toBe(`TENANT#${A}#SESSION#sess_owned_by_b`);
+    for (const pk of pks) expect(pk).not.toContain(B);
+  });
+
+  it("getUserTenantId reads the caller's own USER# record only", async () => {
+    const { getUserTenantId } = await import("./lib/admin-ddb.js");
+    await getUserTenantId("sub_a");
+    const pk = ddb.commandCalls(GetCommand)[0]!.args[0].input.Key!.PK;
+    expect(pk).toBe("USER#sub_a");
+  });
+});

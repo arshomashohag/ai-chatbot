@@ -36,6 +36,7 @@ export interface TenantConfig {
   model: string;
   systemPrompt: string;
   killSwitch: boolean;
+  businessProfile?: string;
 }
 
 const DEFAULT_MODEL = "claude-haiku-4-5";
@@ -54,7 +55,8 @@ function toTenantConfig(
     branding: item.branding as TenantConfig["branding"],
     model: (item.model as string) ?? DEFAULT_MODEL,
     systemPrompt: (item.systemPrompt as string) ?? DEFAULT_SYSTEM_PROMPT,
-    killSwitch: (item.killSwitch as boolean) ?? false
+    killSwitch: (item.killSwitch as boolean) ?? false,
+    businessProfile: item.businessProfile as string | undefined
   };
 }
 
@@ -73,6 +75,11 @@ export async function findTenantBySiteKeyHash(
   );
   const item = res.Items?.[0];
   if (!item) return null;
+  // A grace-key pointer item (rotation) carries only tenantId; resolve the
+  // authoritative CONFIG so branding/origins/status are correct.
+  if (typeof item.SK === "string" && item.SK.startsWith("GRACEKEY#")) {
+    return getTenantConfig(item.tenantId as string);
+  }
   return toTenantConfig(item.tenantId as string, item);
 }
 

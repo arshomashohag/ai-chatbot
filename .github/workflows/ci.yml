@@ -44,6 +44,16 @@ jobs:
       - name: Widget size budget (<=30KB gz)
         run: pnpm widget:size
 
+      - name: Build marketing site
+        run: pnpm --filter @platform/marketing build
+
+      - name: Build portal
+        run: pnpm --filter @platform/dashboard build
+        env:
+          VITE_API_BASE: https://api-dev.example.com
+          VITE_USER_POOL_ID: us-east-1_placeholder
+          VITE_USER_POOL_CLIENT_ID: placeholder
+
       - name: CDK synth
         env:
           DOMAIN_NAME: ${{ vars.DOMAIN_NAME || 'example.com' }}
@@ -73,8 +83,19 @@ jobs:
       - name: Build widget
         run: pnpm --filter @platform/widget build
 
+      - name: Build portal (E2E)
+        run: pnpm --filter @platform/dashboard build
+        env:
+          VITE_E2E: "1"
+          VITE_API_BASE: http://localhost:4500
+          VITE_USER_POOL_ID: us-east-1_e2estub
+          VITE_USER_POOL_CLIENT_ID: e2eclient123
+
       - name: Install Playwright browser
         run: pnpm --filter @platform/e2e exec playwright install --with-deps chromium
 
       - name: Widget handshake E2E
-        run: pnpm --filter @platform/e2e test
+        run: pnpm --filter @platform/e2e exec playwright test
+
+      - name: Money-path E2E (signup→key→embed→answer→transcript)
+        run: pnpm --filter @platform/e2e exec playwright test --config money.config.ts

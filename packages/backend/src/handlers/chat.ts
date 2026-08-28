@@ -15,6 +15,8 @@ import {
   SESSION_LIMIT,
   TENANT_LIMIT
 } from "../lib/rate-limit.js";
+import { listKb } from "../lib/admin-ddb.js";
+import { assembleSystemPrompt } from "../lib/prompt-assembly.js";
 import { tenantPk } from "@platform/shared";
 
 const FRIENDLY_DEGRADE =
@@ -68,14 +70,22 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     );
   }
 
-  const history = await queryHistory(claims.tenant_id, claims.session_id);
+  const [history, kb] = await Promise.all([
+    queryHistory(claims.tenant_id, claims.session_id),
+    listKb(claims.tenant_id)
+  ]);
+
+  const { prompt: systemPrompt } = assembleSystemPrompt(config.systemPrompt, {
+    businessProfile: config.businessProfile,
+    entries: kb
+  });
 
   let result;
   try {
     const adapter = new AnthropicAdapter({
       apiKey: await modelApiKey(),
       model: config.model,
-      systemPrompt: config.systemPrompt
+      systemPrompt
     });
     result = await runChat({
       tenantId: claims.tenant_id,

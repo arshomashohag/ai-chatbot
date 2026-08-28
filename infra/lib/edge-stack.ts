@@ -23,6 +23,8 @@ export interface EdgeStackProps extends StackProps {
 export class EdgeStack extends Stack {
   public readonly widgetBucket: Bucket;
   public readonly chatBucket: Bucket;
+  public readonly marketingBucket: Bucket;
+  public readonly portalBucket: Bucket;
 
   constructor(scope: Construct, id: string, props: EdgeStackProps) {
     super(scope, id, props);
@@ -56,25 +58,52 @@ export class EdgeStack extends Stack {
       }
     });
 
-    this.makeDistribution(
-      "CdnDistribution",
+    this.marketingBucket = this.privateBucket("MarketingBucket");
+    this.portalBucket = this.privateBucket("PortalBucket");
+
+    this.makeDistribution({
+      id: "CdnDistribution",
       zone,
-      config.subdomains.cdn,
-      this.widgetBucket,
-      securityHeaders,
-      cdnWaf.attrArn
-    );
-    this.makeDistribution(
-      "ChatDistribution",
+      domain: config.subdomains.cdn,
+      bucket: this.widgetBucket,
+      responseHeadersPolicy: securityHeaders,
+      webAclId: cdnWaf.attrArn,
+      rootObject: "widget.js"
+    });
+    this.makeDistribution({
+      id: "ChatDistribution",
       zone,
-      config.subdomains.chat,
-      this.chatBucket,
-      securityHeaders,
-      cdnWaf.attrArn
-    );
+      domain: config.subdomains.chat,
+      bucket: this.chatBucket,
+      responseHeadersPolicy: securityHeaders,
+      webAclId: cdnWaf.attrArn,
+      rootObject: "chat.html"
+    });
+    this.makeDistribution({
+      id: "MarketingDistribution",
+      zone,
+      domain: config.subdomains.www,
+      bucket: this.marketingBucket,
+      responseHeadersPolicy: securityHeaders,
+      webAclId: cdnWaf.attrArn,
+      rootObject: "index.html",
+      spa: true
+    });
+    this.makeDistribution({
+      id: "PortalDistribution",
+      zone,
+      domain: config.subdomains.app,
+      bucket: this.portalBucket,
+      responseHeadersPolicy: securityHeaders,
+      webAclId: cdnWaf.attrArn,
+      rootObject: "index.html",
+      spa: true
+    });
 
     new CfnOutput(this, "WidgetBucketName", { value: this.widgetBucket.bucketName });
     new CfnOutput(this, "ChatBucketName", { value: this.chatBucket.bucketName });
+    new CfnOutput(this, "MarketingBucketName", { value: this.marketingBucket.bucketName });
+    new CfnOutput(this, "PortalBucketName", { value: this.portalBucket.bucketName });
   }
 
   private privateBucket(id: string): Bucket {
@@ -88,38 +117,46 @@ export class EdgeStack extends Stack {
     });
   }
 
-  private makeDistribution(
-    id: string,
-    zone: IHostedZone,
-    domain: string,
-    bucket: Bucket,
-    responseHeadersPolicy: ResponseHeadersPolicy,
-    webAclId: string
-  ): Distribution {
-    const cert = new Certificate(this, `${id}Cert`, {
-      domainName: domain,
-      validation: CertificateValidation.fromDns(zone),
+  private makeDistribution(opts: {
+    id: string;
+    zone: IHostedZone;
+    domain: string;
+    bucket: Bucket;
+    responseHeadersPolicy: ResponseHeadersPolicy;
+    webAclId: string;
+    rootObject: string;
+    spa?: boolean;
+  }): Distribution {
+    const cert = new Certificate(this, `${opts.id}Cert`, {
+      domainName: opts.domain,
+      validation: CertificateValidation.fromDns(opts.zone)
       // CloudFront requires certs in us-east-1; stack should be deployed there.
     });
 
-    const dist = new Distribution(this, id, {
-      domainNames: [domain],
+    const dist = new Distribution(this, opts.id, {
+      domainNames: [opts.domain],
       certificate: cert,
-      webAclId,
-      defaultRootObject: id === "ChatDistribution" ? "chat.html" : "widget.js",
+      webAclId: opts.webAclId,
+      defaultRootObject: opts.rootObject,
       minimumProtocolVersion: SecurityPolicyProtocol.TLS_V1_2_2021,
       defaultBehavior: {
-        origin: S3BucketOrigin.withOriginAccessControl(bucket),
+        origin: S3BucketOrigin.withOriginAccessControl(opts.bucket),
         viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: CachePolicy.CACHING_OPTIMIZED,
-        responseHeadersPolicy,
+        responseHeadersPolicy: opts.responseHeadersPolicy,
         compress: true
-      }
+      },
+      errorResponses: opts.spa
+        ? [
+            { httpStatus: 403, responseHttpStatus: 200, responsePagePath: "/index.html" },
+            { httpStatus: 404, responseHttpStatus: 200, responsePagePath: "/index.html" }
+          ]
+        : undefined
     });
 
-    new ARecord(this, `${id}Alias`, {
-      zone,
-      recordName: domain,
+    new ARecord(this, `${opts.id}Alias`, {
+      zone: opts.zone,
+      recordName: opts.domain,
       target: RecordTarget.fromAlias(new CloudFrontTarget(dist))
     });
 

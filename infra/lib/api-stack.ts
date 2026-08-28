@@ -17,6 +17,15 @@ import { Key, KeySpec, KeyUsage } from "aws-cdk-lib/aws-kms";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { CfnWebACLAssociation } from "aws-cdk-lib/aws-wafv2";
+import {
+  UserPool,
+  UserPoolClient,
+  AccountRecovery
+} from "aws-cdk-lib/aws-cognito";
+import {
+  HttpJwtAuthorizer
+} from "aws-cdk-lib/aws-apigatewayv2-authorizers";
+import { RemovalPolicy } from "aws-cdk-lib";
 import { makeWebAcl } from "./waf.js";
 import type { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { nodeHandler } from "./lambda.js";
@@ -168,6 +177,86 @@ export class ApiStack extends Stack {
       path: "/v1/chat/message",
       methods: [HttpMethod.POST, HttpMethod.OPTIONS],
       integration: new HttpLambdaIntegration("ChatIntegration", this.chatFn)
+    });
+
+    // --- Portal auth (Cognito) + admin routes ---
+    const postConfirm = nodeHandler(this, "PostConfirmFn", {
+      handlerFile: "post-confirmation.ts",
+      environment: { ENV: config.env, TABLE_NAME: table.tableName }
+    });
+    postConfirm.addToRolePolicy(
+      new PolicyStatement({
+        actions: ["dynamodb:GetItem", "dynamodb:PutItem"],
+        resources: [table.tableArn],
+        conditions: {
+          "ForAllValues:StringLike": {
+            "dynamodb:LeadingKeys": ["USER#*", "TENANT#*"]
+          }
+        }
+      })
+    );
+
+    const userPool = new UserPool(this, "UserPool", {
+      userPoolName: `platform-${config.env}`,
+      selfSignUpEnabled: true,
+      signInAliases: { email: true },
+      autoVerify: { email: true },
+      accountRecovery: AccountRecovery.EMAIL_ONLY,
+      standardAttributes: { email: { required: true, mutable: false } },
+      lambdaTriggers: { postConfirmation: postConfirm },
+      removalPolicy:
+        config.env === "prod" ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY
+    });
+    const userPoolClient = new UserPoolClient(this, "UserPoolClient", {
+      userPool,
+      authFlows: { userSrp: true }
+    });
+
+    const authorizer = new HttpJwtAuthorizer(
+      "CognitoAuthorizer",
+      `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`,
+      { jwtAudience: [userPoolClient.userPoolClientId] }
+    );
+
+    const admin = nodeHandler(this, "AdminFn", {
+      handlerFile: "admin.ts",
+      environment: {
+        ENV: config.env,
+        TABLE_NAME: table.tableName,
+        CDN_ORIGIN: config.subdomains.cdn
+      }
+    });
+    // Admin operations span USER# (profile lookup) and TENANT# (config, KB,
+    // sessions, key issuance) partitions; tenant is derived server-side from
+    // the Cognito sub, never from the request body.
+    admin.addToRolePolicy(
+      new PolicyStatement({
+        actions: [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem"
+        ],
+        resources: [table.tableArn],
+        conditions: {
+          "ForAllValues:StringLike": {
+            "dynamodb:LeadingKeys": ["USER#*", "TENANT#*"]
+          }
+        }
+      })
+    );
+
+    this.httpApi.addRoutes({
+      path: "/v1/admin/{proxy+}",
+      methods: [HttpMethod.GET, HttpMethod.POST, HttpMethod.PUT, HttpMethod.DELETE],
+      integration: new HttpLambdaIntegration("AdminIntegration", admin),
+      authorizer
+    });
+
+    new CfnOutput(this, "UserPoolId", { value: userPool.userPoolId });
+    new CfnOutput(this, "UserPoolClientId", {
+      value: userPoolClient.userPoolClientId
     });
 
     new ARecord(this, "ApiAliasRecord", {
