@@ -56,6 +56,31 @@ jobs:
           VITE_USER_POOL_ID: ${{ vars.USER_POOL_ID }}
           VITE_USER_POOL_CLIENT_ID: ${{ vars.USER_POOL_CLIENT_ID }}
 
+      # Debug: print the exact claims AWS matches the role trust policy against.
+      # Compare `sub` / `aud` here to the trust policy in
+      # infra/bootstrap/github-deploy-role.yaml. No secrets are printed.
+      - name: Debug OIDC token claims
+        env:
+          ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE }}
+        run: |
+          echo "role-to-assume: ${ROLE_ARN}"
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "::error::Could not fetch an OIDC token — is 'id-token: write' granted?"
+            exit 1
+          fi
+          # Decode the JWT payload (2nd segment). jq's @base64d needs padding,
+          # so pad the base64url payload to a multiple of 4 first.
+          payload=$(echo "$TOKEN" | cut -d. -f2 | tr '_-' '/+')
+          case $(( ${#payload} % 4 )) in
+            2) payload="${payload}==" ;;
+            3) payload="${payload}=" ;;
+          esac
+          echo "OIDC claims presented to AWS:"
+          echo "$payload" | base64 -d | jq '{iss, aud, sub, repository, repository_owner, ref, environment, workflow, job_workflow_ref}'
+          echo "AWS matches: aud == \"sts.amazonaws.com\" and sub against the trust policy StringLike."
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE }}
