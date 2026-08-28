@@ -22,6 +22,13 @@ tests green → reviewer subagent pass → conventional commit → PROGRESS upda
 
 Resolved in P1: widget now imports `@platform/shared` zod schemas (P0 #2); session Lambda DDB grants scoped with `dynamodb:LeadingKeys` (P0 #3).
 
+## Design system
+- Imported the "AI Chatbot design system" (Claude Design) and applied it across all three UIs, keeping existing functionality + copy: purple accent (#6D5AE6), Plus Jakarta Sans + Instrument Serif display, pill buttons, layered elevation.
+- Widget: gradient-header panel (26px radius), greeting-as-message + suggested pills, accent user bubbles / typing dots, pill composer, tenant-accent driven from branding color.
+- Marketing: nav + hero (serif italic accent) + feature cards, re-skinned.
+- Portal: token-based cards, inputs, buttons, transcript bubbles.
+- Canonical tokens live in `packages/shared/design/tokens.css` (exported as `@platform/shared/design/tokens.css`); each static bundle inlines its own copy to stay dependency-free. Both Playwright suites (handshake + money-path) green after the restyle.
+
 ## P4 gate
 - Marketing static site (`www`): hero/features/CTA, dogfoods its own widget via a demo tenant key (Vite env-injected).
 - Cognito user pool (email verify, SRP-only) + post-confirmation trigger creates USER#/TENANT# records (condition-guarded, no overwrite).

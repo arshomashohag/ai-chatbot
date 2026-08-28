@@ -31,17 +31,29 @@ function bubbleStyles(): string {
   return `
     :host { all: initial; }
     .bubble {
-      position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px;
+      position: fixed; bottom: 22px; right: 22px; width: 60px; height: 60px;
       border-radius: 50%; border: none; cursor: pointer; z-index: 2147483000;
-      background: #111; color: #fff; font: 600 14px system-ui;
+      display: grid; place-items: center; color: #fff;
+      background: linear-gradient(135deg, #8271ec, #6d5ae6);
+      box-shadow: 0 14px 34px -10px rgba(109,90,230,.7), 0 2px 6px rgba(20,19,26,.18);
+      transition: transform .16s ease, box-shadow .16s ease;
     }
+    .bubble:hover { transform: translateY(-2px); box-shadow: 0 20px 40px -10px rgba(109,90,230,.75); }
+    .bubble svg { width: 26px; height: 26px; }
     .frame {
-      position: fixed; bottom: 88px; right: 20px; width: 380px; height: 560px;
-      max-width: calc(100vw - 40px); max-height: calc(100vh - 120px);
-      border: none; border-radius: 12px; z-index: 2147483000;
-      box-shadow: 0 8px 30px rgba(0,0,0,.25); display: none; background: #fff;
+      position: fixed; bottom: 94px; right: 22px; width: 384px; height: 600px;
+      max-width: calc(100vw - 32px); max-height: calc(100vh - 120px);
+      border: none; border-radius: 26px; z-index: 2147483000;
+      box-shadow: 0 28px 70px -18px rgba(20,19,26,.34), 0 2px 6px rgba(20,19,26,.06);
+      display: none; background: #fff;
     }
     .frame.open { display: block; }
+    @media (max-width: 480px) {
+      .frame.open {
+        inset: 0; width: 100%; height: 100%;
+        max-width: none; max-height: none; border-radius: 0;
+      }
+    }
   `;
 }
 
@@ -85,7 +97,11 @@ function boot(): void {
   bubble.className = "bubble";
   bubble.type = "button";
   bubble.setAttribute("aria-label", "Open chat");
-  bubble.textContent = "Chat";
+  bubble.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 20l1.4-4.2' +
+    'A8.5 8.5 0 1 1 21 11.5z"></path></svg>';
   shadow.appendChild(bubble);
 
   let frame: HTMLIFrameElement | null = null;

@@ -15,7 +15,9 @@ test("allowed origin: bubble renders and handshake succeeds", async ({ page }) =
 
   const frame = page.frameLocator("[data-platform-widget] iframe.frame");
   await expect(frame.locator("#root")).toHaveAttribute("data-state", "connected");
-  await expect(frame.locator("#status")).toHaveText("Hi there!");
+  // The greeting is rendered as the first assistant message bubble.
+  await expect(frame.locator(".msg.bot").first()).toHaveText("Hi there!");
+  await expect(frame.locator("#header")).toHaveText("Dev Bot");
 });
 
 test("foreign origin: handshake returns 403, chat shows unavailable", async ({ page }) => {

@@ -4,50 +4,347 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Chatbot Platform — AI chat for your store</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap"
+    />
     <style>
-      :root { --ink: #14110c; --paper: #f4f1ea; --accent: #c05a2e; }
-      * { box-sizing: border-box; }
-      body { margin: 0; font: 17px/1.6 Georgia, "Times New Roman", serif; color: var(--ink); background: var(--paper); }
-      header, section { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
-      .hero h1 { font-size: 52px; line-height: 1.1; margin: 0 0 16px; }
-      .hero p { font-size: 21px; max-width: 620px; color: #4a4438; }
-      .cta { display: inline-block; margin-top: 24px; background: var(--ink); color: var(--paper); padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; }
-      .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 32px; }
-      .feature h3 { margin: 0 0 6px; font-size: 22px; color: var(--accent); }
-      .feature p { margin: 0; color: #4a4438; font-size: 16px; }
-      footer { text-align: center; padding: 32px; color: #6b6357; font-size: 14px; }
-      em { color: var(--accent); font-style: italic; }
+      :root {
+        --color-bg: #f6f5fa;
+        --color-surface: #fff;
+        --color-text: #14131a;
+        --color-accent: #6d5ae6;
+        --color-accent-100: #f4f1fe;
+        --color-accent-700: #4f3ec0;
+        --color-divider: rgba(20, 19, 26, 0.09);
+        --color-neutral-600: #8e8a9e;
+        --color-neutral-700: #6f6c7d;
+        --font-heading: "Plus Jakarta Sans", system-ui, sans-serif;
+        --font-display: "Instrument Serif", Georgia, serif;
+        --shadow-sm: 0 2px 8px -3px rgba(20, 19, 26, 0.12);
+        --shadow-md: 0 10px 28px -12px rgba(20, 19, 26, 0.2);
+        --shadow-lg: 0 28px 70px -18px rgba(20, 19, 26, 0.32);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+        background: var(--color-bg);
+        color: var(--color-text);
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+
+      /* Top nav */
+      nav {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 22px 0;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        font-size: 17px;
+      }
+      .brand .mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        background: linear-gradient(135deg, #8271ec, #6d5ae6);
+        box-shadow: 0 6px 16px -6px rgba(109, 90, 230, 0.7);
+      }
+      nav .spacer {
+        margin-left: auto;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-family: inherit;
+        font-weight: 600;
+        font-size: 15px;
+        text-decoration: none;
+        color: var(--color-text);
+        background: #fff;
+        border: 1px solid var(--color-divider);
+        border-radius: 999px;
+        padding: 11px 22px;
+        box-shadow: var(--shadow-sm);
+        cursor: pointer;
+        transition:
+          transform 0.12s ease,
+          filter 0.12s ease;
+      }
+      .btn:hover {
+        transform: translateY(-1px);
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #8271ec, #6d5ae6);
+        color: #fff;
+        border-color: transparent;
+        box-shadow: 0 8px 20px -8px rgba(109, 90, 230, 0.7);
+      }
+      .btn-primary:hover {
+        filter: brightness(1.06);
+      }
+      .btn-ghost {
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+        color: var(--color-accent);
+      }
+
+      /* Hero */
+      .hero {
+        padding: 56px 0 40px;
+        max-width: 760px;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: var(--color-accent-700);
+        background: var(--color-accent-100);
+        border-radius: 999px;
+        padding: 6px 14px;
+        margin-bottom: 22px;
+      }
+      .hero h1 {
+        font-family: var(--font-heading);
+        font-weight: 800;
+        font-size: clamp(40px, 6.5vw, 62px);
+        line-height: 1.04;
+        letter-spacing: -0.03em;
+        margin: 0 0 18px;
+      }
+      .hero h1 em {
+        font-family: var(--font-display);
+        font-weight: 400;
+        font-style: italic;
+        color: var(--color-accent);
+        letter-spacing: 0;
+      }
+      .hero p {
+        font-size: 20px;
+        color: var(--color-neutral-700);
+        max-width: 620px;
+        margin: 0 0 28px;
+      }
+      .hero .actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      /* Features */
+      .features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 20px;
+        padding: 32px 0 64px;
+      }
+      .feature {
+        background: #fff;
+        border: 1px solid var(--color-divider);
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: var(--shadow-sm);
+        transition:
+          transform 0.16s ease,
+          box-shadow 0.16s ease;
+      }
+      .feature:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-md);
+      }
+      .feature .ico {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        margin-bottom: 16px;
+        color: var(--color-accent);
+        background: var(--color-accent-100);
+      }
+      .feature h3 {
+        font-family: var(--font-heading);
+        font-weight: 700;
+        font-size: 20px;
+        letter-spacing: -0.02em;
+        margin: 0 0 8px;
+      }
+      .feature p {
+        margin: 0;
+        color: var(--color-neutral-700);
+        font-size: 15px;
+      }
+
+      footer {
+        border-top: 1px solid var(--color-divider);
+        padding: 28px 0;
+        color: var(--color-neutral-600);
+        font-size: 14px;
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
     </style>
   </head>
   <body>
-    <header class="hero">
-      <h1>Your store's <em>always-on</em> assistant.</h1>
-      <p>
-        Drop in one line of script and give every visitor a knowledgeable
-        chat assistant grounded in your own products and FAQs. Ask the bot in
-        the corner — it answers questions about this very platform.
-      </p>
-      <a class="cta" href="/app">Get started free</a>
-    </header>
+    <div class="wrap">
+      <nav>
+        <div class="brand">
+          <span class="mark">
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="4" y="8" width="16" height="12" rx="4"></rect>
+              <path d="M12 4.5v3.5M9.5 14h.01M14.5 14h.01"></path>
+            </svg>
+          </span>
+          AI Chatbot
+        </div>
+        <span class="spacer"></span>
+        <a class="btn btn-ghost" href="/app">Log in</a>
+        <a class="btn btn-primary" href="/app">Get started free</a>
+      </nav>
 
-    <section>
-      <div class="features">
+      <header class="hero">
+        <span class="eyebrow">
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M13 2L3 14h7l-1 8 10-12h-7z"></path>
+          </svg>
+          Live in five minutes
+        </span>
+        <h1>Your store's <em>always-on</em> assistant.</h1>
+        <p>
+          Drop in one line of script and give every visitor a knowledgeable chat
+          assistant grounded in your own products and FAQs. Ask the bot in the
+          corner — it answers questions about this very platform.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/app">Get started free</a>
+          <a class="btn" href="/app">See how it works</a>
+        </div>
+      </header>
+
+      <section class="features">
         <div class="feature">
+          <div class="ico">
+            <svg
+              width="21"
+              height="21"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M16 18l6-6-6-6M8 6l-6 6 6 6"></path>
+            </svg>
+          </div>
           <h3>One-line embed</h3>
-          <p>A single script tag renders a chat bubble on any page. No build step, no framework lock-in.</p>
+          <p>
+            A single script tag renders a chat bubble on any page. No build step,
+            no framework lock-in.
+          </p>
         </div>
         <div class="feature">
+          <div class="ico">
+            <svg
+              width="21"
+              height="21"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+          </div>
           <h3>Grounded answers</h3>
-          <p>Add a business profile and FAQ entries; the assistant answers from them, not from thin air.</p>
+          <p>
+            Add a business profile and FAQ entries; the assistant answers from
+            them, not from thin air.
+          </p>
         </div>
         <div class="feature">
+          <div class="ico">
+            <svg
+              width="21"
+              height="21"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+          </div>
           <h3>Safe by default</h3>
-          <p>Per-origin site keys, rate limits, and a kill switch keep your bot — and your bill — under control.</p>
+          <p>
+            Per-origin site keys, rate limits, and a kill switch keep your bot —
+            and your bill — under control.
+          </p>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <footer>Built on AWS. © Chatbot Platform.</footer>
+      <footer>
+        <span>Built on AWS. © Chatbot Platform.</span>
+        <span>Powered by AI Chatbot</span>
+      </footer>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -5,6 +5,12 @@ const parentOrigin = new URLSearchParams(location.search).get("parentOrigin");
 let token = "";
 let apiBase = "";
 
+const SUGGESTED = [
+  "Where is my order?",
+  "Do you have this in stock?",
+  "What's your return policy?"
+];
+
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
   if (!node) throw new Error(`missing #${id}`);
@@ -20,12 +26,47 @@ function appendMessage(role: "user" | "bot", text: string): void {
   log.scrollTop = log.scrollHeight;
 }
 
+function showTyping(): HTMLElement {
+  const div = document.createElement("div");
+  div.className = "typing";
+  div.setAttribute("aria-label", "Assistant is typing");
+  div.innerHTML = "<span></span><span></span><span></span>";
+  const log = el("log");
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+function renderSuggested(): void {
+  const log = el("log");
+  const wrap = document.createElement("div");
+  wrap.id = "suggested";
+  const label = document.createElement("div");
+  label.className = "label";
+  label.textContent = "Suggested";
+  wrap.appendChild(label);
+  for (const q of SUGGESTED) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "suggest";
+    b.innerHTML = `${q} <span>→</span>`;
+    b.addEventListener("click", () => {
+      wrap.remove();
+      if (token) void send(q);
+    });
+    wrap.appendChild(b);
+  }
+  log.appendChild(wrap);
+}
+
 function renderConnected(branding: SessionResponse["branding"]): void {
-  const header = el("header");
-  header.textContent = branding.displayName;
-  header.style.color = branding.color;
-  el("status").textContent = branding.greeting;
+  document.documentElement.style.setProperty("--wa", branding.color);
+  el("header").textContent = branding.displayName;
+  el("status").remove();
+  appendMessage("bot", branding.greeting);
+  renderSuggested();
   el("root").dataset.state = "connected";
+  el<HTMLInputElement>("input").focus();
 }
 
 function renderUnavailable(): void {
@@ -34,12 +75,13 @@ function renderUnavailable(): void {
 }
 
 async function send(text: string): Promise<void> {
+  document.getElementById("suggested")?.remove();
   const input = el<HTMLInputElement>("input");
   const button = el<HTMLButtonElement>("send");
   input.value = "";
   button.disabled = true;
   appendMessage("user", text);
-  el("status").textContent = "…";
+  const typing = showTyping();
   try {
     const res = await fetch(`${apiBase}/v1/chat/message`, {
       method: "POST",
@@ -49,6 +91,7 @@ async function send(text: string): Promise<void> {
       },
       body: JSON.stringify({ message: text })
     });
+    typing.remove();
     if (res.status === 429) {
       appendMessage(
         "bot",
@@ -63,9 +106,9 @@ async function send(text: string): Promise<void> {
       parsed.success ? parsed.data.reply : "Sorry, something went wrong."
     );
   } catch {
+    typing.remove();
     appendMessage("bot", "Network error. Please try again.");
   } finally {
-    el("status").textContent = "";
     button.disabled = false;
     input.focus();
   }

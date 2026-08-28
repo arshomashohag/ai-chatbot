@@ -7,7 +7,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./node": "./src/keys-node.ts"
+    "./node": "./src/keys-node.ts",
+    "./design/tokens.css": "./design/tokens.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
