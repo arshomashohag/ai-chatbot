@@ -20,7 +20,7 @@ export class DataStack extends Stack {
     super(scope, id, props);
 
     this.table = new Table(this, "PlatformTable", {
-      tableName: `platform-${props.envName}`,
+      tableName: `chatbot-platform-${props.envName}`,
       partitionKey: { name: "PK", type: AttributeType.STRING },
       sortKey: { name: "SK", type: AttributeType.STRING },
       billingMode: BillingMode.PAY_PER_REQUEST,

@@ -115,7 +115,7 @@ export class EdgeStack extends Stack {
       // Explicit, predictable name (globally unique via the account id) so the
       // deploy role's asset-sync IAM can target it and the sync command is
       // deterministic: platform-<env>-<role>-<account>.
-      bucketName: `platform-${env}-${role}-${this.account}`,
+      bucketName: `chatbot-platform-${env}-${role}-${this.account}`,
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
       encryption: BucketEncryption.S3_MANAGED,
       versioned: true,

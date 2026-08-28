@@ -14,7 +14,7 @@ const PRODUCTS = [
   { productId: "p4", name: "Black Jeans", price: 49, available: false }
 ];
 
-const TABLE = process.env.TABLE_NAME ?? "platform-dev";
+const TABLE = process.env.TABLE_NAME ?? "chatbot-platform-dev";
 const TENANT_ID = process.env.SEED_TENANT_ID ?? "t_dev";
 const SITE_KEY = process.env.SEED_SITE_KEY ?? "pk_live_devtenant000001";
 const ORIGINS = (

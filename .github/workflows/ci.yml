@@ -50,7 +50,7 @@ jobs:
       - name: Build portal
         run: pnpm --filter @platform/dashboard build
         env:
-          VITE_API_BASE: https://api-dev.example.com
+          VITE_API_BASE: https://chatbot-api-dev.example.com
           VITE_USER_POOL_ID: us-east-1_placeholder
           VITE_USER_POOL_CLIENT_ID: placeholder
 

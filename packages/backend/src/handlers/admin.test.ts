@@ -32,6 +32,8 @@ describe("admin handler", () => {
     process.env.TABLE_NAME = "platform-test";
     process.env.ENV = "dev";
     process.env.CDN_ORIGIN = "cdn.example.com";
+    process.env.CHAT_ORIGIN = "chat.example.com";
+    process.env.API_ORIGIN = "chatbot-api-dev.example.com";
   });
 
   it("rejects a request with no Cognito sub", async () => {
@@ -92,6 +94,9 @@ describe("admin handler", () => {
     const parsed = JSON.parse(r.body);
     expect(parsed.siteKey.startsWith("pk_live_")).toBe(true);
     expect(parsed.snippet).toContain("data-site-key");
+    expect(parsed.snippet).toContain(
+      'data-api-base="https://chatbot-api-dev.example.com"'
+    );
     // Confirm the stored value is a hash, never the plaintext.
     const update = ddb
       .commandCalls(UpdateCommand)

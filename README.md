@@ -45,7 +45,7 @@ aws cloudformation describe-stacks --stack-name chatbot-github-deploy-dev \
   --query "Stacks[0].Outputs[?OutputKey=='DeployRoleArn'].OutputValue" --output text
 
 # 4. Store the model API key (never a GitHub secret).
-aws secretsmanager create-secret --name platform-dev/model-api-key \
+aws secretsmanager create-secret --name chatbot-platform-dev/model-api-key \
   --secret-string "<your-anthropic-key>"
 ```
 
@@ -55,7 +55,7 @@ GitHub OIDC provider is allowed per account.
 
 The deploy role uses least privilege: it assumes the CDK bootstrap roles to
 create resources (so it needs no broad service permissions of its own), reads
-stack outputs, and writes to the `platform-<env>-*-<account>` asset buckets.
+stack outputs, and writes to the `chatbot-platform-<env>-*-<account>` asset buckets.
 
 ## Local dev
 
@@ -76,7 +76,7 @@ Portal/marketing read Vite env at build time:
 Seed a dev tenant + dummy catalog (needs AWS creds + a deployed table):
 
 ```bash
-TABLE_NAME=platform-dev pnpm --filter @platform/backend seed
+TABLE_NAME=chatbot-platform-dev pnpm --filter @platform/backend seed
 ```
 
 ## GitHub configuration
@@ -87,7 +87,7 @@ Set these under **Settings → Secrets and variables → Actions**.
 
 | Name | Purpose |
 |---|---|
-| `DOMAIN_NAME` | Root domain; CDK derives `cdn.`, `api-{env}.`, `chat.`, `app.`, `www.` |
+| `DOMAIN_NAME` | Root domain; CDK derives `cdn.`, `chatbot-api-{env}.`, `chat.`, `app.`, `www.` |
 | `HOSTED_ZONE_ID_DEV` | Route 53 zone id for dev (lets CI `cdk synth` skip a live lookup) |
 
 ### Secrets (`secrets.*`)
@@ -100,7 +100,7 @@ Set these under **Settings → Secrets and variables → Actions**.
 
 No AWS access keys anywhere — CI authenticates via GitHub OIDC only. The model
 API key is **not** a GitHub secret; it lives in Secrets Manager at
-`platform-{env}/model-api-key` (create it once per account, see below).
+`chatbot-platform-{env}/model-api-key` (create it once per account, see below).
 
 ## Deploy flow
 
@@ -123,7 +123,7 @@ GitHub environment.
 
 `cdk deploy` provisions the S3 buckets + CloudFront distributions but does not
 upload site assets. After a deploy, build and sync each bundle to its bucket
-(names are CloudFormation outputs of the `Platform-{env}-Edge` stack):
+(names are CloudFormation outputs of the `ChatbotPlatform-{env}-Edge` stack):
 
 ```bash
 pnpm --filter @platform/widget build
@@ -136,7 +136,7 @@ aws cloudfront create-invalidation --distribution-id <cdn> --paths /widget.js
 
 ## Architecture notes
 
-- **Single table** `platform-{env}` with `GSI1` for site-key lookup. Tenant
+- **Single table** `chatbot-platform-{env}` with `GSI1` for site-key lookup. Tenant
   isolation is app-layer: keys are derived from verified JWT / Cognito claims,
   never client input; `dynamodb:LeadingKeys` bounds each Lambda to `TENANT#`.
 - **Widget JWTs** are ES256, signed by KMS (private key never leaves the HSM),

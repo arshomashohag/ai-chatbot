@@ -91,9 +91,9 @@ Resources:
                 Effect: Allow
                 Action:
                   - cloudformation:DescribeStacks
-                Resource: !Sub arn:${AWS::Partition}:cloudformation:*:${AWS::AccountId}:stack/Platform-${EnvName}-*/*
+                Resource: !Sub arn:${AWS::Partition}:cloudformation:*:${AWS::AccountId}:stack/ChatbotPlatform-${EnvName}-*/*
               # Sync built widget/chat/marketing/portal assets to the buckets.
-              # Bucket names are platform-<env>-<role>-<account> (set in CDK).
+              # Bucket names are chatbot-platform-<env>-<role>-<account> (CDK).
               - Sid: SyncAssets
                 Effect: Allow
                 Action:
@@ -102,8 +102,8 @@ Resources:
                   - s3:GetObject
                   - s3:ListBucket
                 Resource:
-                  - !Sub arn:${AWS::Partition}:s3:::platform-${EnvName}-*-${AWS::AccountId}
-                  - !Sub arn:${AWS::Partition}:s3:::platform-${EnvName}-*-${AWS::AccountId}/*
+                  - !Sub arn:${AWS::Partition}:s3:::chatbot-platform-${EnvName}-*-${AWS::AccountId}
+                  - !Sub arn:${AWS::Partition}:s3:::chatbot-platform-${EnvName}-*-${AWS::AccountId}/*
               # Invalidate the widget pointer after a widget release.
               - Sid: Invalidate
                 Effect: Allow

@@ -24,8 +24,16 @@ import {
 
 const GRACE_SECONDS = 24 * 60 * 60;
 
-function snippet(siteKey: string, cdnOrigin: string): string {
-  return `<script src="https://${cdnOrigin}/widget.js" data-site-key="${siteKey}" data-chat-origin="https://${cdnOrigin.replace("cdn.", "chat.")}" data-api-base="https://${cdnOrigin.replace("cdn.", "api-" + (process.env.ENV ?? "dev") + ".")}"></script>`;
+function snippet(siteKey: string): string {
+  const cdn = process.env.CDN_ORIGIN ?? "cdn.example.com";
+  const chat = process.env.CHAT_ORIGIN ?? "chat.example.com";
+  const api = process.env.API_ORIGIN ?? "chatbot-api-dev.example.com";
+  return (
+    `<script src="https://${cdn}/widget.js" ` +
+    `data-site-key="${siteKey}" ` +
+    `data-chat-origin="https://${chat}" ` +
+    `data-api-base="https://${api}"></script>`
+  );
 }
 
 async function computeSetupComplete(tenantId: string): Promise<boolean> {
@@ -119,10 +127,9 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
     }
     const plaintext = generateSiteKey();
     await issueSiteKey(tenantId, plaintext, GRACE_SECONDS);
-    const cdnOrigin = process.env.CDN_ORIGIN ?? "cdn.example.com";
     const res: IssueKeyResponse = {
       siteKey: plaintext,
-      snippet: snippet(plaintext, cdnOrigin)
+      snippet: snippet(plaintext)
     };
     return json(200, res);
   }

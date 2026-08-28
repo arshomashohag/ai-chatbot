@@ -27,7 +27,7 @@ export class ObservabilityStack extends Stack {
     const { envName, chatFn, sessionFn, table } = props;
 
     const alarmTopic = new Topic(this, "AlarmTopic", {
-      topicName: `platform-${envName}-alarms`
+      topicName: `chatbot-platform-${envName}-alarms`
     });
     const action = new SnsAction(alarmTopic);
 
@@ -73,7 +73,7 @@ export class ObservabilityStack extends Stack {
     throttleAlarm.addAlarmAction(action);
 
     const dashboard = new Dashboard(this, "Dashboard", {
-      dashboardName: `platform-${envName}`
+      dashboardName: `chatbot-platform-${envName}`
     });
     dashboard.addWidgets(
       new GraphWidget({

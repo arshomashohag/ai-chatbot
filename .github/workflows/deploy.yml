@@ -46,13 +46,13 @@ jobs:
         env:
           VITE_CDN_ORIGIN: https://cdn.${{ vars.DOMAIN_NAME }}
           VITE_CHAT_ORIGIN: https://chat.${{ vars.DOMAIN_NAME }}
-          VITE_API_BASE: https://api-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
+          VITE_API_BASE: https://chatbot-api-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
           VITE_DEMO_SITE_KEY: ${{ vars.DEMO_SITE_KEY }}
 
       - name: Build portal
         run: pnpm --filter @platform/dashboard build
         env:
-          VITE_API_BASE: https://api-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
+          VITE_API_BASE: https://chatbot-api-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
           VITE_USER_POOL_ID: ${{ vars.USER_POOL_ID }}
           VITE_USER_POOL_CLIENT_ID: ${{ vars.USER_POOL_CLIENT_ID }}
 
@@ -73,7 +73,7 @@ jobs:
         env:
           ENV: ${{ inputs.env }}
         run: |
-          stack="Platform-${ENV}-Edge"
+          stack="ChatbotPlatform-${ENV}-Edge"
           get() { aws cloudformation describe-stacks --stack-name "$stack" \
             --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
           aws s3 sync packages/widget/dist      "s3://$(get WidgetBucketName)"    --delete

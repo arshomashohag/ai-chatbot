@@ -13,7 +13,7 @@ const cdkEnv = {
   region: config.region
 };
 
-const prefix = `Platform-${config.env}`;
+const prefix = `ChatbotPlatform-${config.env}`;
 
 const data = new DataStack(app, `${prefix}-Data`, {
   env: cdkEnv,

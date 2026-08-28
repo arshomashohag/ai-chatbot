@@ -66,7 +66,7 @@ export class ApiStack extends Stack {
     });
 
     this.httpApi = new HttpApi(this, "HttpApi", {
-      apiName: `platform-api-${config.env}`,
+      apiName: `chatbot-platform-api-${config.env}`,
       defaultDomainMapping: { domainName: domain }
     });
 
@@ -88,7 +88,7 @@ export class ApiStack extends Stack {
     const jwtKey = new Key(this, "WidgetJwtKey", {
       keySpec: KeySpec.ECC_NIST_P256,
       keyUsage: KeyUsage.SIGN_VERIFY,
-      alias: `platform-${config.env}-widget-jwt`
+      alias: `chatbot-platform-${config.env}-widget-jwt`
     });
 
     this.sessionFn = nodeHandler(this, "SessionFn", {
@@ -135,7 +135,7 @@ export class ApiStack extends Stack {
     const modelKeySecret = Secret.fromSecretNameV2(
       this,
       "ModelApiKeySecret",
-      `platform-${config.env}/model-api-key`
+      `chatbot-platform-${config.env}/model-api-key`
     );
 
     this.chatFn = nodeHandler(this, "ChatFn", {
@@ -197,7 +197,7 @@ export class ApiStack extends Stack {
     );
 
     const userPool = new UserPool(this, "UserPool", {
-      userPoolName: `platform-${config.env}`,
+      userPoolName: `chatbot-platform-${config.env}`,
       selfSignUpEnabled: true,
       signInAliases: { email: true },
       autoVerify: { email: true },
@@ -223,7 +223,9 @@ export class ApiStack extends Stack {
       environment: {
         ENV: config.env,
         TABLE_NAME: table.tableName,
-        CDN_ORIGIN: config.subdomains.cdn
+        CDN_ORIGIN: config.subdomains.cdn,
+        CHAT_ORIGIN: config.subdomains.chat,
+        API_ORIGIN: config.subdomains.api
       }
     });
     // Admin operations span USER# (profile lookup) and TENANT# (config, KB,

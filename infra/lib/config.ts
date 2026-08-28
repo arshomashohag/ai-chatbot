@@ -16,7 +16,7 @@ export interface PlatformConfig {
 }
 
 function apiSubdomain(env: EnvName, domain: string): string {
-  return `api-${env}.${domain}`;
+  return `chatbot-api-${env}.${domain}`;
 }
 
 export function loadConfig(): PlatformConfig {

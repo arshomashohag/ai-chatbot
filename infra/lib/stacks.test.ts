@@ -15,9 +15,9 @@ describe("DataStack", () => {
     template = Template.fromStack(stack);
   });
 
-  it("creates the single table named platform-dev with TTL", () => {
+  it("creates the single table named chatbot-platform-dev with TTL", () => {
     template.hasResourceProperties("AWS::DynamoDB::Table", {
-      TableName: "platform-dev",
+      TableName: "chatbot-platform-dev",
       TimeToLiveSpecification: { AttributeName: "ttl", Enabled: true }
     });
   });
