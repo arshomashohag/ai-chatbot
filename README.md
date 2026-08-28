@@ -12,7 +12,7 @@ agnostic model adapter (Claude Haiku primary).
 | `packages/shared` | zod contracts + DDB key helpers (imported by widget, portal, backend) |
 | `packages/widget` | IIFE loader (`widget.js`) + iframe chat app (`chat.*`) |
 | `packages/backend` | Lambda handlers: health, session, chat, admin, post-confirmation |
-| `packages/marketing` | static homepage (`www.*`), dogfoods its own widget |
+| `packages/marketing` | static homepage (`chatbot-site-<env>`), dogfoods its own widget |
 | `packages/dashboard` | tenant portal SPA (`app.*`) |
 | `infra` | CDK app: Data, Api, Edge, Observability stacks |
 | `e2e` | Playwright: widget handshake + money-path |
@@ -87,7 +87,7 @@ Set these under **Settings → Secrets and variables → Actions**.
 
 | Name | Purpose |
 |---|---|
-| `DOMAIN_NAME` | Base domain; every subdomain is env-specific: CDK derives `chatbot-{cdn,api,chat,app,www}-{env}.<DOMAIN_NAME>` (the apex is never used) |
+| `DOMAIN_NAME` | Base domain; every subdomain is env-specific: CDK derives `chatbot-{cdn,api,chat,app,site}-{env}.<DOMAIN_NAME>` (no `www`, apex never used) |
 | `HOSTED_ZONE_ID_DEV` | Route 53 zone id for dev (lets CI `cdk synth` skip a live lookup) |
 
 ### Secrets (`secrets.*`)

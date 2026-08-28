@@ -86,7 +86,7 @@ export class EdgeStack extends Stack {
     this.makeDistribution({
       id: "MarketingDistribution",
       zone,
-      domain: config.subdomains.www,
+      domain: config.subdomains.site,
       bucket: this.marketingBucket,
       responseHeadersPolicy: securityHeaders,
       webAclId: cdnWaf.attrArn,

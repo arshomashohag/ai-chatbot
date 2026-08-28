@@ -11,7 +11,7 @@ export interface PlatformConfig {
     api: string;
     chat: string;
     app: string;
-    www: string;
+    site: string;
   };
 }
 
@@ -41,7 +41,7 @@ export function loadConfig(): PlatformConfig {
       api: sub("api", env, domainName),
       chat: sub("chat", env, domainName),
       app: sub("app", env, domainName),
-      www: sub("www", env, domainName)
+      site: sub("site", env, domainName)
     }
   };
 }
