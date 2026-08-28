@@ -121,19 +121,25 @@ workflow**. Each deploy assumes the env's OIDC role and passes `DOMAIN_NAME` to
 CDK. Prod is additionally gated by a required-reviewer rule on the `prod`
 GitHub environment.
 
-### Static assets
+### Static assets & frontend config
 
-`cdk deploy` provisions the S3 buckets + CloudFront distributions but does not
-upload site assets. After a deploy, build and sync each bundle to its bucket
-(names are CloudFormation outputs of the `ChatbotPlatform-{env}-Edge` stack):
+The deploy workflow builds the widget, then (after `cdk deploy`) builds the
+marketing site and portal reading **every** origin and Cognito id straight from
+the stack outputs — `ApiOrigin` (Api stack) and `CdnOrigin` / `ChatOrigin` /
+`SiteOrigin` / `PortalOrigin` + the `*BucketName`s (Edge stack). Nothing about
+the URL scheme, env, or domain is re-derived in CI, so the pipeline is
+env-independent: change the subdomain scheme in `infra/lib/config.ts` and both
+the infrastructure and the frontend builds follow automatically. It then syncs
+each bundle to its bucket. To do this by hand:
 
 ```bash
-pnpm --filter @platform/widget build
-aws s3 sync packages/widget/dist       "s3://$WIDGET_BUCKET"
-aws s3 sync packages/widget/dist-chat  "s3://$CHAT_BUCKET"
-aws s3 sync packages/marketing/dist    "s3://$MARKETING_BUCKET"
-aws s3 sync packages/dashboard/dist    "s3://$PORTAL_BUCKET"
-aws cloudfront create-invalidation --distribution-id <cdn> --paths /widget.js
+api=ChatbotPlatform-<env>-Api; edge=ChatbotPlatform-<env>-Edge
+out() { aws cloudformation describe-stacks --stack-name "$1" \
+  --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text; }
+aws s3 sync packages/widget/dist      "s3://$(out "$edge" WidgetBucketName)"
+aws s3 sync packages/widget/dist-chat "s3://$(out "$edge" ChatBucketName)"
+aws s3 sync packages/marketing/dist   "s3://$(out "$edge" MarketingBucketName)"
+aws s3 sync packages/dashboard/dist   "s3://$(out "$edge" PortalBucketName)"
 ```
 
 ## Architecture notes

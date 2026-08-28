@@ -283,7 +283,7 @@ export class ApiStack extends Stack {
       throttlingRateLimit: 100
     };
 
-    new CfnOutput(this, "ApiUrl", {
+    new CfnOutput(this, "ApiOrigin", {
       value: `https://${config.subdomains.api}`
     });
   }

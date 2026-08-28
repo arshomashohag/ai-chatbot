@@ -41,15 +41,6 @@ jobs:
       - name: Widget size budget
         run: pnpm widget:size
 
-      - name: Build marketing
-        run: pnpm --filter @platform/marketing build
-        env:
-          VITE_CDN_ORIGIN: https://chatbot-cdn-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
-          VITE_CHAT_ORIGIN: https://chatbot-chat-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
-          VITE_API_BASE: https://chatbot-api-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
-          VITE_PORTAL_URL: https://chatbot-app-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
-          VITE_DEMO_SITE_KEY: ${{ vars.DEMO_SITE_KEY }}
-
       # Debug: print the exact claims AWS matches the role trust policy against.
       # Compare `sub` / `aud` here to the trust policy in
       # infra/bootstrap/github-deploy-role.yaml. No secrets are printed.
@@ -88,20 +79,35 @@ jobs:
           APP_VERSION: ${{ github.sha }}
         run: pnpm --filter @platform/infra run deploy
 
-      # The portal must be built with the Cognito pool created by CDK, so this
-      # runs AFTER deploy and reads the pool ids straight from the Api stack
-      # outputs — no manual GitHub vars, no first-deploy chicken-and-egg.
-      - name: Build portal
+      # Build the frontends AFTER deploy, reading every origin and id straight
+      # from the deployed stack outputs — nothing about the URL scheme, env, or
+      # domain is re-derived here, so the pipeline stays env-independent.
+      - name: Build frontends from stack outputs
         env:
           ENV: ${{ inputs.env }}
-          DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
         run: |
           api="ChatbotPlatform-${ENV}-Api"
-          out() { aws cloudformation describe-stacks --stack-name "$api" \
-            --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
-          VITE_API_BASE="https://chatbot-api-${ENV}.${DOMAIN_NAME}" \
-          VITE_USER_POOL_ID="$(out UserPoolId)" \
-          VITE_USER_POOL_CLIENT_ID="$(out UserPoolClientId)" \
+          edge="ChatbotPlatform-${ENV}-Edge"
+          out() { aws cloudformation describe-stacks --stack-name "$1" \
+            --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text; }
+
+          API_ORIGIN="$(out "$api" ApiOrigin)"
+          CDN_ORIGIN="$(out "$edge" CdnOrigin)"
+          CHAT_ORIGIN="$(out "$edge" ChatOrigin)"
+          PORTAL_ORIGIN="$(out "$edge" PortalOrigin)"
+          USER_POOL_ID="$(out "$api" UserPoolId)"
+          USER_POOL_CLIENT_ID="$(out "$api" UserPoolClientId)"
+
+          VITE_CDN_ORIGIN="$CDN_ORIGIN" \
+          VITE_CHAT_ORIGIN="$CHAT_ORIGIN" \
+          VITE_API_BASE="$API_ORIGIN" \
+          VITE_PORTAL_URL="$PORTAL_ORIGIN" \
+          VITE_DEMO_SITE_KEY="${{ vars.DEMO_SITE_KEY }}" \
+            pnpm --filter @platform/marketing build
+
+          VITE_API_BASE="$API_ORIGIN" \
+          VITE_USER_POOL_ID="$USER_POOL_ID" \
+          VITE_USER_POOL_CLIENT_ID="$USER_POOL_CLIENT_ID" \
             pnpm --filter @platform/dashboard build
 
       - name: Sync static assets to S3

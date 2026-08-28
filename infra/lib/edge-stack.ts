@@ -108,6 +108,13 @@ export class EdgeStack extends Stack {
     new CfnOutput(this, "ChatBucketName", { value: this.chatBucket.bucketName });
     new CfnOutput(this, "MarketingBucketName", { value: this.marketingBucket.bucketName });
     new CfnOutput(this, "PortalBucketName", { value: this.portalBucket.bucketName });
+
+    // Public origins — the single source of truth for frontend builds. The
+    // deploy pipeline reads these instead of re-deriving subdomain strings.
+    new CfnOutput(this, "CdnOrigin", { value: `https://${config.subdomains.cdn}` });
+    new CfnOutput(this, "ChatOrigin", { value: `https://${config.subdomains.chat}` });
+    new CfnOutput(this, "SiteOrigin", { value: `https://${config.subdomains.site}` });
+    new CfnOutput(this, "PortalOrigin", { value: `https://${config.subdomains.app}` });
   }
 
   private privateBucket(id: string, env: string, role: string): Bucket {
