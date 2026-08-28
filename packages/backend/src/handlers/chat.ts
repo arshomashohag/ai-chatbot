@@ -10,6 +10,12 @@ import { queryHistory, persistMessages, incrementUsage } from "../lib/ddb.js";
 import { AnthropicAdapter } from "../lib/adapter/anthropic.js";
 import { modelApiKey } from "../lib/secrets.js";
 import { runChat } from "../lib/chat-engine.js";
+import {
+  allow,
+  SESSION_LIMIT,
+  TENANT_LIMIT
+} from "../lib/rate-limit.js";
+import { tenantPk } from "@platform/shared";
 
 const FRIENDLY_DEGRADE =
   "Sorry, I'm having trouble right now. Please try again in a moment.";
@@ -45,6 +51,21 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const config = await cachedTenantConfig(claims.tenant_id);
   if (!config || config.status === "suspended" || config.killSwitch) {
     return error(503, "unavailable", "Chat is temporarily unavailable");
+  }
+
+  const now = Date.now();
+  const pk = tenantPk(claims.tenant_id);
+  const [sessionOk, tenantOk] = await Promise.all([
+    allow(pk, `RL#SESSION#${claims.session_id}`, SESSION_LIMIT, now),
+    allow(pk, "RL#TENANT", TENANT_LIMIT, now)
+  ]);
+  if (!sessionOk || !tenantOk) {
+    return error(
+      429,
+      "rate_limited",
+      "You're sending messages too quickly. Please slow down.",
+      { "retry-after": "10" }
+    );
   }
 
   const history = await queryHistory(claims.tenant_id, claims.session_id);
@@ -90,6 +111,18 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut
   });
+
+  console.log(
+    JSON.stringify({
+      event: "chat_message",
+      tenant: claims.tenant_id,
+      session: claims.session_id,
+      model: config.model,
+      tokensIn: result.tokensIn,
+      tokensOut: result.tokensOut,
+      latencyMs: Date.now() - now
+    })
+  );
 
   const body: ChatMessageResponse = {
     reply: result.reply,

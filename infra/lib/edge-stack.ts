@@ -13,6 +13,7 @@ import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { Certificate, CertificateValidation } from "aws-cdk-lib/aws-certificatemanager";
 import { HostedZone, ARecord, RecordTarget, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { CloudFrontTarget } from "aws-cdk-lib/aws-route53-targets";
+import { makeWebAcl } from "./waf.js";
 import type { PlatformConfig } from "./config.js";
 
 export interface EdgeStackProps extends StackProps {
@@ -37,6 +38,8 @@ export class EdgeStack extends Stack {
     this.widgetBucket = this.privateBucket("WidgetBucket");
     this.chatBucket = this.privateBucket("ChatBucket");
 
+    const cdnWaf = makeWebAcl(this, "CdnWaf", "CLOUDFRONT", config.env);
+
     const securityHeaders = new ResponseHeadersPolicy(this, "SecHeaders", {
       securityHeadersBehavior: {
         contentTypeOptions: { override: true },
@@ -58,14 +61,16 @@ export class EdgeStack extends Stack {
       zone,
       config.subdomains.cdn,
       this.widgetBucket,
-      securityHeaders
+      securityHeaders,
+      cdnWaf.attrArn
     );
     this.makeDistribution(
       "ChatDistribution",
       zone,
       config.subdomains.chat,
       this.chatBucket,
-      securityHeaders
+      securityHeaders,
+      cdnWaf.attrArn
     );
 
     new CfnOutput(this, "WidgetBucketName", { value: this.widgetBucket.bucketName });
@@ -88,7 +93,8 @@ export class EdgeStack extends Stack {
     zone: IHostedZone,
     domain: string,
     bucket: Bucket,
-    responseHeadersPolicy: ResponseHeadersPolicy
+    responseHeadersPolicy: ResponseHeadersPolicy,
+    webAclId: string
   ): Distribution {
     const cert = new Certificate(this, `${id}Cert`, {
       domainName: domain,
@@ -99,6 +105,7 @@ export class EdgeStack extends Stack {
     const dist = new Distribution(this, id, {
       domainNames: [domain],
       certificate: cert,
+      webAclId,
       defaultRootObject: id === "ChatDistribution" ? "chat.html" : "widget.js",
       minimumProtocolVersion: SecurityPolicyProtocol.TLS_V1_2_2021,
       defaultBehavior: {

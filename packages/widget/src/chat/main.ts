@@ -49,6 +49,13 @@ async function send(text: string): Promise<void> {
       },
       body: JSON.stringify({ message: text })
     });
+    if (res.status === 429) {
+      appendMessage(
+        "bot",
+        "You're sending messages too quickly. Please wait a moment."
+      );
+      return;
+    }
     const body = await res.json().catch(() => null);
     const parsed = ChatMessageResponse.safeParse(body);
     appendMessage(

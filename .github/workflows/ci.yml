@@ -35,6 +35,9 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Cross-tenant isolation suite
+        run: pnpm exec vitest run packages/backend/src/isolation.test.ts
+
       - name: Build widget
         run: pnpm --filter @platform/widget build
 

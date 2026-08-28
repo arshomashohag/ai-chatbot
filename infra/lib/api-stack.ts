@@ -16,6 +16,9 @@ import type { Table } from "aws-cdk-lib/aws-dynamodb";
 import { Key, KeySpec, KeyUsage } from "aws-cdk-lib/aws-kms";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
+import { CfnWebACLAssociation } from "aws-cdk-lib/aws-wafv2";
+import { makeWebAcl } from "./waf.js";
+import type { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { nodeHandler } from "./lambda.js";
 import { tenantPk } from "@platform/shared";
 import type { PlatformConfig } from "./config.js";
@@ -27,6 +30,8 @@ export interface ApiStackProps extends StackProps {
 
 export class ApiStack extends Stack {
   public readonly httpApi: HttpApi;
+  public readonly chatFn: NodejsFunction;
+  public readonly sessionFn: NodejsFunction;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
@@ -77,7 +82,7 @@ export class ApiStack extends Stack {
       alias: `platform-${config.env}-widget-jwt`
     });
 
-    const session = nodeHandler(this, "SessionFn", {
+    this.sessionFn = nodeHandler(this, "SessionFn", {
       handlerFile: "session.ts",
       environment: {
         ENV: config.env,
@@ -91,7 +96,7 @@ export class ApiStack extends Stack {
     // cross-tenant isolation is enforced in app code via the site-key GSI
     // lookup that derives tenantId server-side). Per-tenant IAM would require
     // request-scoped credentials (revisit in a later phase).
-    session.addToRolePolicy(
+    this.sessionFn.addToRolePolicy(
       new PolicyStatement({
         actions: ["dynamodb:GetItem", "dynamodb:PutItem"],
         resources: [table.tableArn],
@@ -102,18 +107,18 @@ export class ApiStack extends Stack {
         }
       })
     );
-    session.addToRolePolicy(
+    this.sessionFn.addToRolePolicy(
       new PolicyStatement({
         actions: ["dynamodb:Query"],
         resources: [`${table.tableArn}/index/GSI1`]
       })
     );
-    jwtKey.grant(session, "kms:Sign");
+    jwtKey.grant(this.sessionFn, "kms:Sign");
 
     this.httpApi.addRoutes({
       path: "/v1/widget/session",
       methods: [HttpMethod.POST, HttpMethod.OPTIONS],
-      integration: new HttpLambdaIntegration("SessionIntegration", session)
+      integration: new HttpLambdaIntegration("SessionIntegration", this.sessionFn)
     });
 
     // MODEL_API_KEY is supplied at deploy time via secret material — never in
@@ -124,7 +129,7 @@ export class ApiStack extends Stack {
       `platform-${config.env}/model-api-key`
     );
 
-    const chat = nodeHandler(this, "ChatFn", {
+    this.chatFn = nodeHandler(this, "ChatFn", {
       handlerFile: "chat.ts",
       memorySize: 1024,
       environment: {
@@ -139,7 +144,7 @@ export class ApiStack extends Stack {
     // usage at TENANT#<id>, and message history at TENANT#<id>#SESSION#<sid>.
     // The LeadingKeys condition therefore bounds the handler to tenant
     // partitions; app code binds session→tenant from the JWT claims.
-    chat.addToRolePolicy(
+    this.chatFn.addToRolePolicy(
       new PolicyStatement({
         actions: [
           "dynamodb:GetItem",
@@ -156,13 +161,13 @@ export class ApiStack extends Stack {
         }
       })
     );
-    jwtKey.grant(chat, "kms:GetPublicKey");
-    modelKeySecret.grantRead(chat);
+    jwtKey.grant(this.chatFn, "kms:GetPublicKey");
+    modelKeySecret.grantRead(this.chatFn);
 
     this.httpApi.addRoutes({
       path: "/v1/chat/message",
       methods: [HttpMethod.POST, HttpMethod.OPTIONS],
-      integration: new HttpLambdaIntegration("ChatIntegration", chat)
+      integration: new HttpLambdaIntegration("ChatIntegration", this.chatFn)
     });
 
     new ARecord(this, "ApiAliasRecord", {
@@ -174,6 +179,15 @@ export class ApiStack extends Stack {
           domain.regionalHostedZoneId
         )
       )
+    });
+
+    const webAcl = makeWebAcl(this, "ApiWaf", "REGIONAL", config.env);
+    const stageArn =
+      `arn:aws:apigateway:${this.region}::/apis/` +
+      `${this.httpApi.apiId}/stages/$default`;
+    new CfnWebACLAssociation(this, "ApiWafAssoc", {
+      resourceArn: stageArn,
+      webAclArn: webAcl.attrArn
     });
 
     new CfnOutput(this, "ApiUrl", {

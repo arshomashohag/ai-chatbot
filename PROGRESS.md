@@ -9,7 +9,7 @@ Multi-tenant AI chatbot platform. Phases per `docs/chatbot-platform-implementati
 | P0 | Monorepo scaffold + CI/CD | ✅ complete |
 | P1 | Widget + session auth | ✅ complete |
 | P2 | Chat pipeline + model + one tool | ✅ complete |
-| P3 | Abuse protection | ⬜ not started |
+| P3 | Abuse protection | ✅ complete |
 | P4 | Marketing site + tenant portal v1 | ⬜ not started |
 
 ## Gate checklist (each phase)
@@ -21,6 +21,15 @@ tests green → reviewer subagent pass → conventional commit → PROGRESS upda
 - [P4] Loader: require `data-api-base` and validate it's absolute; silent fail-closed if a tenant misconfigures. (reviewer P1 #6)
 
 Resolved in P1: widget now imports `@platform/shared` zod schemas (P0 #2); session Lambda DDB grants scoped with `dynamodb:LeadingKeys` (P0 #3).
+
+## P3 gate
+- Rate limits both axes (DDB atomic fixed-window counter, conditional-update cap): per-session 10/min, per-tenant 600/min, checked before the model call → 429 + retry-after; widget shows a slow-down message.
+- WAF: regional ACL on the HTTP API `$default` stage + CLOUDFRONT ACL on both distributions, each with an IP rate rule (1000/IP) + AWS CommonRuleSet.
+- Kill-switch honored ≤60s via the 60s config cache TTL (P2).
+- Structured JSON logs on every chat: tenant, session, model, tokensIn/Out, latencyMs (no message body / token / key).
+- CloudWatch dashboard (p50/p95 latency, invocations/errors, DDB throttles) + alarms (chat error rate, p95 latency, DDB throttles) → SNS topic, all via CDK.
+- Cross-tenant isolation suite (10 tests) runs as its own ci.yml step: positive + negative assertions that tenant A never reaches tenant B's config/products/messages/sessions/usage/rate-counters.
+- Reviewer: 1 BLOCKER (isolation suite lacked negative cross-tenant assertions) fixed + re-verified; accepted-risk note: LeadingKeys is a prefix guard, isolation is app-layer.
 
 ## P2 gate
 - `POST /v1/chat/message`: JWT verify (ES256 pinned, exp≤60m enforced) → cached tenant config (60s TTL, killSwitch honored) → history Query → prompt assembly → adapter → tool loop (≤5) → BatchWrite persist w/ token counts + usage counter.

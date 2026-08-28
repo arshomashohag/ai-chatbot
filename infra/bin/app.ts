@@ -3,6 +3,7 @@ import { loadConfig } from "../lib/config.js";
 import { DataStack } from "../lib/data-stack.js";
 import { ApiStack } from "../lib/api-stack.js";
 import { EdgeStack } from "../lib/edge-stack.js";
+import { ObservabilityStack } from "../lib/observability-stack.js";
 
 const app = new App();
 const config = loadConfig();
@@ -31,3 +32,12 @@ new EdgeStack(app, `${prefix}-Edge`, {
   env: cdkEnv,
   config
 });
+
+const obs = new ObservabilityStack(app, `${prefix}-Observability`, {
+  env: cdkEnv,
+  envName: config.env,
+  chatFn: api.chatFn,
+  sessionFn: api.sessionFn,
+  table: data.table
+});
+obs.addDependency(api);
