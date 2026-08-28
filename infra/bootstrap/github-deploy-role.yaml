@@ -1,9 +1,10 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  GitHub OIDC provider + a per-environment deploy role for the chatbot
-  platform. The role assumes the CDK bootstrap roles (created by
-  `cdk bootstrap`) to deploy the stacks, and can sync built assets to the
-  platform S3 buckets. No long-lived AWS keys are involved.
+  A per-environment GitHub Actions deploy role for the chatbot platform.
+  Trusts the GitHub OIDC provider that must already exist in this account
+  (this template does not create one). The role assumes the CDK bootstrap
+  roles (created by `cdk bootstrap`) to deploy the stacks, and can sync
+  built assets to the chatbot-platform S3 buckets. No long-lived AWS keys.
 
 Parameters:
   GitHubOrg:
@@ -25,31 +26,15 @@ Parameters:
       Optional override for the OIDC `sub` this role trusts. Leave blank to
       use a sensible default per env (dev/staging = pushes to main, prod =
       the `prod` GitHub environment).
-  CreateOidcProvider:
-    Type: String
-    AllowedValues: ["true", "false"]
-    Default: "true"
-    Description: >
-      Set to "false" if the token.actions.githubusercontent.com OIDC
-      provider already exists in this account (only one is allowed).
 
 Conditions:
-  ShouldCreateOidc: !Equals [!Ref CreateOidcProvider, "true"]
   HasCustomSubject: !Not [!Equals [!Ref SubjectClaim, ""]]
   IsProd: !Equals [!Ref EnvName, "prod"]
 
 Resources:
-  GitHubOidcProvider:
-    Type: AWS::IAM::OIDCProvider
-    Condition: ShouldCreateOidc
-    Properties:
-      Url: https://token.actions.githubusercontent.com
-      ClientIdList:
-        - sts.amazonaws.com
-      ThumbprintList:
-        - 6938fd4d98bba010962f293b7c1f4ba0f6fdf9c7
-        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
-
+  # Assumes the GitHub OIDC provider already exists in this account
+  # (arn:aws:iam::<account>:oidc-provider/token.actions.githubusercontent.com).
+  # This template does not create one.
   DeployRole:
     Type: AWS::IAM::Role
     Properties:
@@ -60,10 +45,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Federated: !If
-                - ShouldCreateOidc
-                - !Ref GitHubOidcProvider
-                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+              Federated: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:

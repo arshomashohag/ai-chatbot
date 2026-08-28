@@ -32,8 +32,8 @@ OIDC-based — no long-lived AWS keys.
 # 1. Bootstrap CDK (creates the cdk-* roles the deploy role assumes).
 pnpm --filter @platform/infra exec cdk bootstrap aws://<ACCOUNT_ID>/us-east-1
 
-# 2. Create the GitHub OIDC provider + deploy role from the bundled template.
-#    Set CreateOidcProvider=false if the provider already exists in the account.
+# 2. Create the deploy role from the bundled template. This assumes the GitHub
+#    OIDC provider already exists in the account; it does not create one.
 aws cloudformation deploy \
   --template-file infra/bootstrap/github-deploy-role.yaml \
   --stack-name chatbot-github-deploy-dev \
@@ -49,9 +49,9 @@ aws secretsmanager create-secret --name chatbot-platform-dev/model-api-key \
   --secret-string "<your-anthropic-key>"
 ```
 
-Repeat with `EnvName=staging` / `prod` (and their accounts). For the second and
-third runs in the **same** account, add `CreateOidcProvider=false` — only one
-GitHub OIDC provider is allowed per account.
+Repeat with `EnvName=staging` / `prod` (and their accounts). The template
+trusts the existing `token.actions.githubusercontent.com` OIDC provider in each
+account — create that provider once per account beforehand if it isn't present.
 
 The deploy role uses least privilege: it assumes the CDK bootstrap roles to
 create resources (so it needs no broad service permissions of its own), reads
