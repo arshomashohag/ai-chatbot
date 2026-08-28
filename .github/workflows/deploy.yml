@@ -47,14 +47,8 @@ jobs:
           VITE_CDN_ORIGIN: https://chatbot-cdn-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
           VITE_CHAT_ORIGIN: https://chatbot-chat-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
           VITE_API_BASE: https://chatbot-api-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
+          VITE_PORTAL_URL: https://chatbot-app-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
           VITE_DEMO_SITE_KEY: ${{ vars.DEMO_SITE_KEY }}
-
-      - name: Build portal
-        run: pnpm --filter @platform/dashboard build
-        env:
-          VITE_API_BASE: https://chatbot-api-${{ inputs.env }}.${{ vars.DOMAIN_NAME }}
-          VITE_USER_POOL_ID: ${{ vars.USER_POOL_ID }}
-          VITE_USER_POOL_CLIENT_ID: ${{ vars.USER_POOL_CLIENT_ID }}
 
       # Debug: print the exact claims AWS matches the role trust policy against.
       # Compare `sub` / `aud` here to the trust policy in
@@ -93,6 +87,22 @@ jobs:
           AWS_REGION: us-east-1
           APP_VERSION: ${{ github.sha }}
         run: pnpm --filter @platform/infra run deploy
+
+      # The portal must be built with the Cognito pool created by CDK, so this
+      # runs AFTER deploy and reads the pool ids straight from the Api stack
+      # outputs — no manual GitHub vars, no first-deploy chicken-and-egg.
+      - name: Build portal
+        env:
+          ENV: ${{ inputs.env }}
+          DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
+        run: |
+          api="ChatbotPlatform-${ENV}-Api"
+          out() { aws cloudformation describe-stacks --stack-name "$api" \
+            --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+          VITE_API_BASE="https://chatbot-api-${ENV}.${DOMAIN_NAME}" \
+          VITE_USER_POOL_ID="$(out UserPoolId)" \
+          VITE_USER_POOL_CLIENT_ID="$(out UserPoolClientId)" \
+            pnpm --filter @platform/dashboard build
 
       - name: Sync static assets to S3
         env:

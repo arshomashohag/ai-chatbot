@@ -70,8 +70,10 @@ pnpm ci:local                          # lint + typecheck + tests + build + synt
 ```
 
 Portal/marketing read Vite env at build time:
-`VITE_API_BASE`, `VITE_CDN_ORIGIN`, `VITE_CHAT_ORIGIN`, `VITE_DEMO_SITE_KEY`
-(marketing) and `VITE_USER_POOL_ID`, `VITE_USER_POOL_CLIENT_ID` (portal).
+`VITE_API_BASE`, `VITE_CDN_ORIGIN`, `VITE_CHAT_ORIGIN`, `VITE_PORTAL_URL`,
+`VITE_DEMO_SITE_KEY` (marketing) and `VITE_API_BASE`, `VITE_USER_POOL_ID`,
+`VITE_USER_POOL_CLIENT_ID` (portal). In CI the portal's pool ids are read
+automatically from the deployed Api stack outputs — no manual GitHub vars.
 
 Seed a dev tenant + dummy catalog (needs AWS creds + a deployed table):
 
