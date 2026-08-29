@@ -79,6 +79,13 @@ async function api(req, res) {
       setupComplete: setupComplete(),
       hasKey: Boolean(tenant.siteKeyHash)
     }, origin);
+  if (url === "/v1/admin/usage")
+    return jsonRes(res, 200, {
+      month: new Date().toISOString().slice(0, 7),
+      messages: 0,
+      limit: 10000,
+      sessions: SESSIONS.list.length
+    }, origin);
   if (url === "/v1/admin/basics") {
     tenant.basics = body;
     return jsonRes(res, 200, { ok: true }, origin);

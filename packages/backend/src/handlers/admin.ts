@@ -25,7 +25,8 @@ import {
   deleteKb,
   issueSiteKey,
   listSessions,
-  getTranscript
+  getTranscript,
+  getUsageSummary
 } from "../lib/admin-ddb.js";
 
 const GRACE_SECONDS = 24 * 60 * 60;
@@ -120,6 +121,11 @@ async function route(
       hasKey: cfg.hasKey
     };
     return json(200, res);
+  }
+
+  if (method === "GET" && path.endsWith("/v1/admin/usage")) {
+    const month = new Date().toISOString().slice(0, 7);
+    return json(200, await getUsageSummary(tenantId, month));
   }
 
   if (method === "PUT" && path.endsWith("/v1/admin/basics")) {

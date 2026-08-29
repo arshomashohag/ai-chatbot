@@ -11,6 +11,10 @@ test("money path: setup → key → embed → FAQ-grounded answer → transcript
   await page.evaluate(() => localStorage.setItem("e2e_token", "test-token"));
   await page.reload();
 
+  // The portal is an app shell with a sidebar. Basics + profile + FAQs live on
+  // the Knowledge section; the key on Install; transcripts on Conversations.
+  await page.getByRole("link", { name: "Knowledge" }).click();
+
   // 1. Business basics (one allowed domain).
   await page.getByTestId("b-name").fill("Hat Shop");
   await page.getByTestId("b-url").fill("https://shop.example.com");
@@ -29,7 +33,8 @@ test("money path: setup → key → embed → FAQ-grounded answer → transcript
   await page.getByTestId("add-kb").click();
   await expect(page.getByTestId("kb-item")).toHaveText(/Returns/);
 
-  // 4. Issue the key (gated on the completed setup); plaintext shown once.
+  // 4. Issue the key on the Install section; plaintext shown once.
+  await page.getByRole("link", { name: "Install" }).click();
   await page.getByTestId("issue-key").click();
   const siteKey = await page.getByTestId("site-key").textContent();
   expect(siteKey).toMatch(/^pk_live_/);
@@ -48,8 +53,8 @@ test("money path: setup → key → embed → FAQ-grounded answer → transcript
   );
   await merchant.close();
 
-  // 6. Transcript is visible in the portal, tenant-scoped.
-  await page.reload();
+  // 6. Transcript is visible in the portal (Conversations section), tenant-scoped.
+  await page.getByRole("link", { name: "Conversations" }).click();
   await page.getByTestId("sess-open").first().click();
   await expect(page.getByTestId("transcript-msg").first()).toContainText(
     "return policy"

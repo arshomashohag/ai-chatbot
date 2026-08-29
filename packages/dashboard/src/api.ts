@@ -4,6 +4,7 @@ import {
   KbEntry,
   SessionSummary,
   StoredMessage,
+  UsageResponse,
   type BusinessBasics,
   type Appearance,
   type KbEntryInput
@@ -35,6 +36,7 @@ async function req<T>(
 
 export const api = {
   getConfig: () => req("GET", "/v1/admin/config").then((c) => AdminConfig.parse(c)),
+  getUsage: () => req("GET", "/v1/admin/usage").then((u) => UsageResponse.parse(u)),
   saveBasics: (b: BusinessBasics) => req("PUT", "/v1/admin/basics", b),
   saveAppearance: (a: Appearance) => req("PUT", "/v1/admin/appearance", a),
   saveProfile: (businessProfile: string) =>

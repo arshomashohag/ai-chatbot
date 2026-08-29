@@ -11,12 +11,15 @@ export const theme = createTheme({
     error: { main: "#c0442c" },
     success: { main: "#0b5f5c" }
   },
-  shape: { borderRadius: 12 },
+  shape: { borderRadius: 14 },
   typography: {
     fontFamily: '"Plus Jakarta Sans", system-ui, sans-serif',
     h1: { fontWeight: 800, letterSpacing: "-0.03em" },
     h2: { fontWeight: 700, letterSpacing: "-0.02em" },
-    button: { textTransform: "none", fontWeight: 600 }
+    h4: { fontWeight: 800, letterSpacing: "-0.02em" },
+    h6: { fontWeight: 700, letterSpacing: "-0.01em" },
+    button: { textTransform: "none", fontWeight: 600 },
+    subtitle2: { fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }
   },
   components: {
     MuiButton: {
@@ -24,6 +27,15 @@ export const theme = createTheme({
       defaultProps: { disableElevation: true }
     },
     MuiTextField: { defaultProps: { size: "small", fullWidth: true } },
-    MuiPaper: { styleOverrides: { root: { backgroundImage: "none" } } }
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: "none",
+          borderRadius: 18,
+          border: "1px solid rgba(20,19,26,0.09)"
+        }
+      }
+    },
+    MuiCard: { defaultProps: { elevation: 0 } }
   }
 });

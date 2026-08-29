@@ -58,6 +58,14 @@ export const IssueKeyResponse = z.object({
 });
 export type IssueKeyResponse = z.infer<typeof IssueKeyResponse>;
 
+export const UsageResponse = z.object({
+  month: z.string(),
+  messages: z.number(),
+  limit: z.number(),
+  sessions: z.number()
+});
+export type UsageResponse = z.infer<typeof UsageResponse>;
+
 export const SessionSummary = z.object({
   sessionId: z.string(),
   origin: z.string(),

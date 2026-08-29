@@ -8,6 +8,7 @@ import {
   DeleteCommand
 } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "./ulid.js";
+import { DEFAULT_MONTHLY_MESSAGE_LIMIT } from "./ddb.js";
 import {
   userPk,
   profileSk,
@@ -16,10 +17,12 @@ import {
   kbSk,
   sessionPk,
   siteKeyGsi,
+  usageSk,
   KB_MAX_ENTRIES,
   assertTenantId,
   assertSessionId,
   type KbEntry,
+  type UsageResponse,
   type KbEntryInput,
   type BusinessBasics,
   type Appearance,
@@ -304,6 +307,51 @@ export async function issueSiteKey(
       }
     })
   );
+}
+
+/**
+ * Usage summary for the portal Overview: this month's message count, the
+ * effective monthly limit, and the number of sessions. All tenant-scoped.
+ */
+export async function getUsageSummary(
+  tenantId: string,
+  month: string
+): Promise<UsageResponse> {
+  assertTenantId(tenantId);
+  const [usage, config, sessions] = await Promise.all([
+    client.send(
+      new GetCommand({
+        TableName: tableName(),
+        Key: { PK: tenantPk(tenantId), SK: usageSk(month) }
+      })
+    ),
+    client.send(
+      new GetCommand({
+        TableName: tableName(),
+        Key: { PK: tenantPk(tenantId), SK: configSk() }
+      })
+    ),
+    client.send(
+      new QueryCommand({
+        TableName: tableName(),
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+        ExpressionAttributeValues: {
+          ":pk": tenantPk(tenantId),
+          ":sk": "SESSION#"
+        },
+        Select: "COUNT"
+      })
+    )
+  ]);
+  const configured = config.Item?.monthlyMessageLimit as number | undefined;
+  const limit =
+    configured && configured > 0 ? configured : DEFAULT_MONTHLY_MESSAGE_LIMIT;
+  return {
+    month,
+    messages: (usage.Item?.messages as number | undefined) ?? 0,
+    limit,
+    sessions: sessions.Count ?? 0
+  };
 }
 
 export async function listSessions(
