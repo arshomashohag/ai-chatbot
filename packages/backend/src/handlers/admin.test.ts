@@ -41,6 +41,24 @@ describe("admin handler", () => {
     expect((res as { statusCode: number }).statusCode).toBe(403);
   });
 
+  it("lazily provisions a tenant when the caller has a valid sub but no tenant record (self-heals a failed post-confirmation)", async () => {
+    // No USER# profile exists yet (post-confirmation never ran / failed).
+    ddb.on(GetCommand).resolves({ Item: undefined });
+    ddb.on(PutCommand).resolves({});
+    ddb.on(QueryCommand).resolves({ Items: [] });
+    const res = await handler(
+      evt("GET", "/v1/admin/config", "sub_new"),
+      ctx,
+      cb
+    );
+    // NOT 403 — the caller is provisioned on the fly and the request succeeds.
+    expect((res as { statusCode: number }).statusCode).toBe(200);
+    // A USER# profile and a TENANT# CONFIG were created.
+    const puts = ddb.commandCalls(PutCommand).map((c) => c.args[0].input);
+    expect(puts.some((p) => (p.Item!.SK as string) === "PROFILE")).toBe(true);
+    expect(puts.some((p) => (p.Item!.SK as string) === "CONFIG")).toBe(true);
+  });
+
   it("derives tenant from the caller's sub, not from the body", async () => {
     ddb.on(GetCommand).resolves({ Item: {} });
     ddb.on(GetCommand, { Key: { PK: userPk("sub_a"), SK: profileSk() } }).resolves({
