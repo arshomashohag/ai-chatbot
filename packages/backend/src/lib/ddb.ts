@@ -57,12 +57,18 @@ export interface TenantConfig {
   model: string;
   systemPrompt: string;
   killSwitch: boolean;
+  monthlyMessageLimit?: number;
   businessProfile?: string;
 }
 
 const DEFAULT_MODEL = "claude-haiku-4-5";
 const DEFAULT_SYSTEM_PROMPT =
   "You are a helpful store assistant. Answer concisely.";
+
+// Platform default monthly message ceiling per tenant. Bounds runaway model
+// spend from a leaked/abused site key when a tenant has no explicit limit set.
+// Far below what the 600/min rate limit alone would permit (~25M/month).
+export const DEFAULT_MONTHLY_MESSAGE_LIMIT = 10_000;
 
 function toTenantConfig(
   tenantId: string,
@@ -77,6 +83,7 @@ function toTenantConfig(
     model: (item.model as string) ?? DEFAULT_MODEL,
     systemPrompt: (item.systemPrompt as string) ?? DEFAULT_SYSTEM_PROMPT,
     killSwitch: (item.killSwitch as boolean) ?? false,
+    monthlyMessageLimit: item.monthlyMessageLimit as number | undefined,
     businessProfile: item.businessProfile as string | undefined
   };
 }
@@ -291,6 +298,39 @@ export async function incrementUsage(params: {
         ":ti": params.tokensIn,
         ":to": params.tokensOut
       }
+    })
+  );
+}
+
+/**
+ * Read the tenant's message count for a month. Eventually-consistent read is
+ * fine here — the goal is bounding runaway spend, not exact billing.
+ */
+export async function getUsage(
+  tenantId: string,
+  month: string
+): Promise<number> {
+  const res = await client.send(
+    new GetCommand({
+      TableName: tableName(),
+      Key: { PK: tenantPk(tenantId), SK: usageSk(month) }
+    })
+  );
+  return (res.Item?.messages as number | undefined) ?? 0;
+}
+
+/**
+ * Hard-stop a tenant by setting killSwitch=true on its CONFIG. Called when a
+ * tenant crosses its monthly quota so all further chat requests short-circuit.
+ * Idempotent.
+ */
+export async function tripKillSwitch(tenantId: string): Promise<void> {
+  await client.send(
+    new UpdateCommand({
+      TableName: tableName(),
+      Key: { PK: tenantPk(tenantId), SK: configSk() },
+      UpdateExpression: "SET killSwitch = :true",
+      ExpressionAttributeValues: { ":true": true }
     })
   );
 }

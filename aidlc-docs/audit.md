@@ -99,3 +99,11 @@ Complete audit trail of user inputs and AI responses. Newest entries appended at
 **Context**: CONSTRUCTION — U2 Code Generation + gate (about to commit)
 
 ---
+
+## CONSTRUCTION U3 — Quota enforcement + auto kill-switch
+**Timestamp**: 2026-08-29T02:30:00Z
+**User Input**: "continue to U3"
+**AI Response**: U2 committed (6292715). U3 Functional Design written. Implemented: TenantConfig.monthlyMessageLimit + DEFAULT_MONTHLY_MESSAGE_LIMIT; getUsage(); tripKillSwitch(); config-cache evictTenantConfig(); chat handler quota check before model call, over-quota friendly reply + auto-kill + cache evict, fail-closed on usage-read error. Tests: 76 green (+6). typecheck+lint clean. Reviewer subagent: traced all paths, "correctly bounds runaway model spend", no findings ≥80. PROGRESS.md U3 gate written. Committing.
+**Context**: CONSTRUCTION — U3 Code Generation + gate (about to commit)
+
+---

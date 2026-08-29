@@ -67,8 +67,8 @@
 ## Construction Progress
 - [x] U1 Chat data-layer — FD + code + 61 tests green (+14) + typecheck/lint clean + reviewer pass + committed (148f222)
 - [x] U2 Widget JWT hardening + Origin binding — FD + code + 70 tests green (+9) + typecheck/lint/size clean + reviewer pass (no findings) + committed
-- [ ] U3 Quota enforcement + auto kill-switch  ← next
-- [ ] U4 Backend robustness
+- [x] U3 Quota enforcement + auto kill-switch — FD + code + 76 tests green (+6) + typecheck/lint clean + reviewer pass (no findings) + committed
+- [ ] U4 Backend robustness  ← next
 - [ ] U5 Widget UX
 - [ ] U6 Portal React+MUI
 - [ ] U7 Marketing + CSP + design-system

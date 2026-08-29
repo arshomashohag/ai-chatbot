@@ -36,6 +36,13 @@ Docs: `aidlc-docs/`. Scope: Tiers 0–2 + all UI (see `aidlc-docs/inception/reve
 - Reviewer: adversarial pass on all 6 scrutiny areas — **no findings ≥80 confidence**; confirmed fail-closed kid/iss/aud, no cache poisoning, origin can't be forged, no legit-token exfil path. Added origin normalization on the compare per a sub-threshold note.
 - Extensions: SECURITY-08 (full token validation: sig+exp+ttl+kid+iss+aud+origin) ✅ · SECURITY-11 (defense in depth) ✅ · SECURITY-15 (fail-closed) ✅ · PBT-02 (DER→JOSE round-trip) ✅.
 
+### U3 gate — Quota enforcement + auto kill-switch ✅
+- **1.1** Usage counters were written but never read → uncapped model spend on a leaked site key. Now: `TenantConfig.monthlyMessageLimit` (+ `DEFAULT_MONTHLY_MESSAGE_LIMIT=10_000` fallback); `getUsage()` reads `USAGE#<month>`; the chat handler checks usage **before** the model call and, at/over limit, returns a friendly over-quota reply, does NOT call the model, and auto-trips the kill-switch (`tripKillSwitch()` + config-cache eviction) so subsequent requests hard-stop.
+- Fail-closed: a usage-read failure degrades to the friendly message (never fail-open into unlimited spend). `0`/negative limit → default (fail-safe, not unlimited).
+- Tests: **76 green** (+6: under/at/over limit, default fallback, 0→default, usage-read-fails-closed). typecheck + lint clean.
+- Reviewer: traced all paths — "correctly bounds runaway model spend", no findings ≥80. Overshoot bounded (≤60s cross-container cache + 600/min rate limit → a few thousand msgs vs 10k default).
+- Extensions: SECURITY-11 (abuse ceiling) ✅ · SECURITY-15 (fail-closed) ✅ · RESILIENCY-10 (graceful over-quota degrade) ✅ · PBT N/A (threshold compare).
+
 ## Open WARNs / TODOs
 - [ops] `dynamodb:LeadingKeys: TENANT#*` bounds session+chat Lambdas to tenant partitions but is NOT per-tenant isolation — enforced in app code (JWT/site-key derive tenantId server-side; message PK embeds tenantId). Per-tenant IAM needs request-scoped creds; revisit later. (reviewer P1 #4, P2 #3)
 - [P3] `search_products` DDB Query is capped at Limit=200 then filtered in-memory; move to a proper query/index if catalogs grow. (reviewer P2 #5)

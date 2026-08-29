@@ -5,8 +5,15 @@ import {
 } from "@platform/shared";
 import { json, error } from "../lib/http.js";
 import { verifyWidgetJwt, JwtError } from "../lib/jwt-verify.js";
-import { cachedTenantConfig } from "../lib/config-cache.js";
-import { queryHistory, persistMessages, incrementUsage } from "../lib/ddb.js";
+import { cachedTenantConfig, evictTenantConfig } from "../lib/config-cache.js";
+import {
+  queryHistory,
+  persistMessages,
+  incrementUsage,
+  getUsage,
+  tripKillSwitch,
+  DEFAULT_MONTHLY_MESSAGE_LIMIT
+} from "../lib/ddb.js";
 import { AnthropicAdapter } from "../lib/adapter/anthropic.js";
 import { modelApiKey } from "../lib/secrets.js";
 import { runChat } from "../lib/chat-engine.js";
@@ -22,6 +29,16 @@ import { tenantPk } from "@platform/shared";
 
 const FRIENDLY_DEGRADE =
   "Sorry, I'm having trouble right now. Please try again in a moment.";
+
+const OVER_QUOTA_REPLY =
+  "This assistant has reached its message limit for now. Please check back later.";
+
+/** Effective monthly limit: tenant override if positive, else the platform default. */
+function effectiveLimit(configured: number | undefined): number {
+  return configured && configured > 0
+    ? configured
+    : DEFAULT_MONTHLY_MESSAGE_LIMIT;
+}
 
 function bearer(event: { headers?: Record<string, string | undefined> }) {
   const raw =
@@ -66,6 +83,41 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const config = await cachedTenantConfig(claims.tenant_id);
   if (!config || config.status === "suspended" || config.killSwitch) {
     return error(503, "unavailable", "Chat is temporarily unavailable");
+  }
+
+  // Monthly quota enforcement — bounds runaway model spend from a leaked/abused
+  // site key. Checked BEFORE the model call so an over-quota tenant is never
+  // billed for another call. A usage-read failure fails CLOSED to the friendly
+  // degrade (never fail-open into unlimited spend).
+  const month = new Date().toISOString().slice(0, 7);
+  const limit = effectiveLimit(config.monthlyMessageLimit);
+  let usage: number;
+  try {
+    usage = await getUsage(claims.tenant_id, month);
+  } catch {
+    return json(200, { reply: FRIENDLY_DEGRADE, sessionId: claims.session_id });
+  }
+  if (usage >= limit) {
+    // Hard-stop the tenant so subsequent requests short-circuit at the config
+    // gate, and evict this container's cached config immediately.
+    try {
+      await tripKillSwitch(claims.tenant_id);
+      evictTenantConfig(claims.tenant_id);
+    } catch {
+      // Best-effort; the over-quota reply below still protects this request.
+    }
+    console.warn(
+      JSON.stringify({
+        event: "quota_exceeded",
+        tenant: claims.tenant_id,
+        usage,
+        limit
+      })
+    );
+    return json(200, {
+      reply: OVER_QUOTA_REPLY,
+      sessionId: claims.session_id
+    });
   }
 
   const now = Date.now();
@@ -121,7 +173,6 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     });
   }
 
-  const month = new Date().toISOString().slice(0, 7);
   await persistMessages({
     tenantId: claims.tenant_id,
     sessionId: claims.session_id,

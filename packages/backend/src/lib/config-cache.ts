@@ -22,3 +22,7 @@ export async function cachedTenantConfig(
 export function clearConfigCache(): void {
   cache.clear();
 }
+
+export function evictTenantConfig(tenantId: string): void {
+  cache.delete(tenantId);
+}
