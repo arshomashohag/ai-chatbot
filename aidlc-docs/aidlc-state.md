@@ -71,8 +71,8 @@
 - [x] U4 Backend robustness — FD + code (2.6/2.7/3.8/3.9/3.13 + bonus 3.12) + 86 tests green (+10) + typecheck/lint clean + reviewer pass (no findings) + committed
 - [x] U5 Widget UX — FD + code (0.3, 4.11–4.17) + 101 unit tests green (+13) + handshake E2E green + widget 1.71KB gz + typecheck/lint clean + reviewer pass (no findings) + committed. money-path E2E pre-existing baseline failure (dashboard mock), addressed in U6.
 - [x] U6 Portal React+MUI — FD + full rewrite + 104 tests (+3 RTL) + BOTH E2E green + XSS gate + typecheck/lint clean + reviewer pass (fixed 1 Critical snackbar-memo + 1 Important CI grep gate) + committed
-- [ ] U7 Marketing + CSP + design-system  ← next
-- [ ] U8 Deploy pipeline safety
+- [x] U7 Marketing + CSP + design-system — FD + code + 108 tests green (+4 CSP) + both E2E green + typecheck/lint/synth clean + reviewer pass (fixed 1 Critical CSS-cascade collision reverting AA fix) + committed. Wired ?mode=signup into portal AuthFlow.
+- [ ] U8 Deploy pipeline safety  ← next
 - [ ] U9 Tests + tenant-access guard
 
 ## Findings Inventory (source of work)

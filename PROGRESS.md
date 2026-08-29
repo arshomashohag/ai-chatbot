@@ -11,7 +11,7 @@ Multi-tenant AI chatbot platform. Phases per `docs/chatbot-platform-implementati
 | P2 | Chat pipeline + model + one tool | ✅ complete |
 | P3 | Abuse protection | ✅ complete |
 | P4 | Marketing site + tenant portal v1 | ✅ complete |
-| RF | Review-findings remediation (AI-DLC, `fix/review-findings`) | 🚧 in progress (U6/9) |
+| RF | Review-findings remediation (AI-DLC, `fix/review-findings`) | 🚧 in progress (U7/9) |
 
 ## Gate checklist (each phase)
 tests green → reviewer subagent pass → conventional commit → PROGRESS update.
@@ -79,6 +79,15 @@ Docs: `aidlc-docs/`. Scope: Tiers 0–2 + all UI (see `aidlc-docs/inception/reve
 - Tests: **104 green** (+3 RTL: validation blocks submit, stepped auth). **Both E2E green** — money-path now passes (was baseline-broken because `dist` wasn't built). typecheck + lint clean. XSS gate clean.
 - Reviewer: found + I fixed a **Critical** (unmemoized snackbar context re-fired Dashboard's load effect → spinner flash + section remount on every save) and an **Important** (the claimed XSS grep gate didn't exist — now added to CI). Re-verified.
 - Extensions: SECURITY-05 (all forms validated) ✅ · SECURITY-08/12 (auth; localStorage tradeoff documented, H1 out of scope, XSS that made it exploitable removed) ✅ · a11y (MUI + autoComplete/inputMode/aria-live snackbar) ✅ · PBT N/A (UI + thin mapping).
+
+### U7 gate — Marketing + CSP + design-system ✅
+- **1.5** Per-surface **CSP** via CDK (built from `config.subdomains`, env-independent): cdn/chat/marketing/portal each get an appropriate policy. `script-src` is never `'unsafe-inline'`; `'unsafe-inline'` limited to `style-src` (MUI/emotion, documented). The **chat surface is framable** (`frame-ancestors *`, no `X-Frame-Options` — it's embedded by tenants) while others are `frame-ancestors 'none'` + DENY. Fixes the wrong-XFO-on-chat sub-point.
+- **2.10** `tokens.css` is now **imported** by marketing (`main.ts`) and portal (`main.tsx`) — the design system is used, not copy-pasted; marketing's duplicated `:root` block removed (added `@platform/shared` dep). Marketing's page-local `.btn*` overrides scoped under `.wrap` so they win over the imported shared classes (reviewer caught the cascade collision that was silently reverting the AA fix).
+- **4.21** `.btn-ghost`/link text → `--color-accent-700` (`#4f3ec0`, ~7:1) — passes WCAG AA.
+- **4.18/4.19** Marketing CTAs distinguished: Log in / Get started free (`?mode=signup`, consumed by the portal) / "See how it works" → `#features` anchor; a **"Try the live demo"** button opens the dogfooded widget (graceful fallback). **4.20** responsive nav. **4.22** one brand name ("AI Chatbot").
+- Tests: **108 green** (+4 CSP template assertions: 4 policies, no `script-src 'unsafe-inline'`, only chat framable, portal→Cognito). Both E2E green; typecheck + lint + synth clean.
+- Reviewer: adversarial pass — confirmed CSP correctness (frame-ancestors * safe: token is unicast via targeted postMessage, not broadcast), script-src strict, env-independent, style-src tradeoff sound; caught **1 Critical** (CSS specificity collision reverting the AA fix in the built artifact) which I fixed (`.wrap`-scoped overrides, re-verified in dist).
+- Extensions: SECURITY-04 (CSP + headers per surface, script-src strict, framing correct) ✅ · a11y (AA contrast) ✅ · PBT N/A.
 
 ## Open WARNs / TODOs
 - [ops] `dynamodb:LeadingKeys: TENANT#*` bounds session+chat Lambdas to tenant partitions but is NOT per-tenant isolation — enforced in app code (JWT/site-key derive tenantId server-side; message PK embeds tenantId). Per-tenant IAM needs request-scoped creds; revisit later. (reviewer P1 #4, P2 #3)

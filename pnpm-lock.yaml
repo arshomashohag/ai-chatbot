@@ -181,6 +181,10 @@ importers:
         version: 6.4.3(@types/node@22.20.1)(tsx@4.23.12)
 
   packages/marketing:
+    dependencies:
+      '@platform/shared':
+        specifier: workspace:^
+        version: link:../shared
     devDependencies:
       typescript:
         specifier: ^5.7.2

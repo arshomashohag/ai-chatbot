@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Chatbot Platform — AI chat for your store</title>
+    <title>AI Chatbot — AI chat for your store</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -11,22 +11,8 @@
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap"
     />
     <style>
-      :root {
-        --color-bg: #f6f5fa;
-        --color-surface: #fff;
-        --color-text: #14131a;
-        --color-accent: #6d5ae6;
-        --color-accent-100: #f4f1fe;
-        --color-accent-700: #4f3ec0;
-        --color-divider: rgba(20, 19, 26, 0.09);
-        --color-neutral-600: #8e8a9e;
-        --color-neutral-700: #6f6c7d;
-        --font-heading: "Plus Jakarta Sans", system-ui, sans-serif;
-        --font-display: "Instrument Serif", Georgia, serif;
-        --shadow-sm: 0 2px 8px -3px rgba(20, 19, 26, 0.12);
-        --shadow-md: 0 10px 28px -12px rgba(20, 19, 26, 0.2);
-        --shadow-lg: 0 28px 70px -18px rgba(20, 19, 26, 0.32);
-      }
+      /* Design tokens come from the shared design system, imported in main.ts
+         (import "@platform/shared/design/tokens.css") — not duplicated here. */
       * {
         box-sizing: border-box;
       }
@@ -74,7 +60,10 @@
         margin-left: auto;
       }
 
-      .btn {
+      /* Scoped under .wrap (specificity 0,2,0) so these page-local button
+         styles win over the shared tokens.css .btn rules (0,1,0), which are
+         imported and would otherwise override them by later-in-cascade order. */
+      .wrap .btn {
         display: inline-flex;
         align-items: center;
         gap: 7px;
@@ -93,23 +82,29 @@
           transform 0.12s ease,
           filter 0.12s ease;
       }
-      .btn:hover {
+      .wrap .btn:hover {
         transform: translateY(-1px);
       }
-      .btn-primary {
+      .wrap .btn-primary {
         background: linear-gradient(135deg, #8271ec, #6d5ae6);
         color: #fff;
         border-color: transparent;
         box-shadow: 0 8px 20px -8px rgba(109, 90, 230, 0.7);
       }
-      .btn-primary:hover {
+      .wrap .btn-primary:hover {
         filter: brightness(1.06);
       }
-      .btn-ghost {
+      .wrap .btn-ghost {
         background: transparent;
         border-color: transparent;
         box-shadow: none;
-        color: var(--color-accent);
+        /* accent-700 passes WCAG AA for text on white (accent alone is ~3.7:1) */
+        color: var(--color-accent-700);
+      }
+      .demo-hint {
+        margin-top: 14px;
+        font-size: 14px;
+        color: var(--color-neutral-700);
       }
 
       /* Hero */
@@ -212,6 +207,31 @@
         gap: 8px;
       }
 
+      /* Responsive nav + hero actions on small screens */
+      @media (max-width: 560px) {
+        nav {
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        nav .btn {
+          padding: 9px 16px;
+          font-size: 14px;
+        }
+        .hero .actions {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .hero .actions .btn {
+          justify-content: center;
+        }
+      }
+      @media (max-width: 380px) {
+        /* Keep the primary signup CTA; drop the secondary login to avoid crowding */
+        nav .btn-ghost {
+          display: none;
+        }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         * {
           animation-duration: 0.01ms !important;
@@ -242,8 +262,8 @@
           AI Chatbot
         </div>
         <span class="spacer"></span>
-        <a class="btn btn-ghost" href="/app">Log in</a>
-        <a class="btn btn-primary" href="/app">Get started free</a>
+        <a class="btn btn-ghost" href="/app" data-portal="login">Log in</a>
+        <a class="btn btn-primary" href="/app" data-portal="signup">Get started free</a>
       </nav>
 
       <header class="hero">
@@ -268,12 +288,14 @@
           corner — it answers questions about this very platform.
         </p>
         <div class="actions">
-          <a class="btn btn-primary" href="/app">Get started free</a>
-          <a class="btn" href="/app">See how it works</a>
+          <a class="btn btn-primary" href="/app" data-portal="signup">Get started free</a>
+          <button class="btn" type="button" data-demo>Try the live demo</button>
+          <a class="btn btn-ghost" href="#features">See how it works</a>
         </div>
+        <p class="demo-hint">Or ask the assistant in the corner ↘</p>
       </header>
 
-      <section class="features">
+      <section class="features" id="features">
         <div class="feature">
           <div class="ico">
             <svg
@@ -341,7 +363,7 @@
       </section>
 
       <footer>
-        <span>Built on AWS. © Chatbot Platform.</span>
+        <span>Built on AWS. © AI Chatbot.</span>
         <span>Powered by AI Chatbot</span>
       </footer>
     </div>

@@ -131,3 +131,11 @@ Complete audit trail of user inputs and AI responses. Newest entries appended at
 **Context**: CONSTRUCTION — U6 Code Generation + gate (about to commit)
 
 ---
+
+## CONSTRUCTION U7 — Marketing + CSP + design-system
+**Timestamp**: 2026-08-29T05:20:00Z
+**User Input**: "continue to U7"
+**AI Response**: U6 committed (93316b4). U7 FD written. Implemented 1.5 (per-surface CSP via CDK makeSecurityHeaders helper, env-independent from config.subdomains; chat framable via frame-ancestors * with no XFO; script-src strict; style-src unsafe-inline documented), 2.10 (tokens.css imported in marketing main.ts + portal main.tsx, marketing :root duplicate removed, @platform/shared dep added), 4.21 (AA accent-700 for text), 4.18/4.19 (CTAs data-portal login/signup + ?mode=signup wired into AuthFlow + demo button + See-how-it-works anchor), 4.20 (responsive nav), 4.22 (brand name). Added edge-csp.test.ts (4 CSP assertions). Tests: 108 green (+4). Both E2E green; typecheck+lint+synth clean. Reviewer subagent: confirmed CSP correctness + found 1 Critical — CSS specificity collision: importing tokens.css (.btn-ghost) + keeping marketing's equal-specificity .btn-ghost let tokens.css win by source order, reverting the AA fix in the built artifact. Fixed by scoping marketing overrides under .wrap (0,2,0 > 0,1,0); re-verified in dist. PROGRESS.md U7 gate written. Committing.
+**Context**: CONSTRUCTION — U7 Code Generation + gate (about to commit)
+
+---

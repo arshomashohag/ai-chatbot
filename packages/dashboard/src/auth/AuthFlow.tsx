@@ -32,8 +32,20 @@ const verifySchema = z.object({
 });
 type VerifyInput = z.infer<typeof verifySchema>;
 
+function initialMode(): Mode {
+  // Marketing's "Get started free" CTA links with ?mode=signup so the portal
+  // opens the signup step directly (login is the default otherwise).
+  try {
+    return new URLSearchParams(window.location.search).get("mode") === "signup"
+      ? "signup"
+      : "login";
+  } catch {
+    return "login";
+  }
+}
+
 export function AuthFlow({ onAuthenticated }: { onAuthenticated: () => void }) {
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [notice, setNotice] = useState<{ kind: "info" | "error"; text: string } | null>(
     null
