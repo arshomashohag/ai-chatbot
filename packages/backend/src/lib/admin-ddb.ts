@@ -7,7 +7,7 @@ import {
   UpdateCommand,
   DeleteCommand
 } from "@aws-sdk/lib-dynamodb";
-import { ulid } from "ulid";
+import { ulid } from "./ulid.js";
 import {
   userPk,
   profileSk,

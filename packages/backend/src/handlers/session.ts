@@ -1,5 +1,5 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
-import { ulid } from "ulid";
+import { ulid } from "../lib/ulid.js";
 import {
   SessionRequest,
   SessionResponse,

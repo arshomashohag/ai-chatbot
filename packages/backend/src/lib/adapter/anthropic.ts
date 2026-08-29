@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { ulid } from "ulid";
+import { ulid } from "../ulid.js";
 import type { ToolDefinition, ToolCall } from "@platform/shared";
 import type { AdapterMessage, CompletionResult, ModelAdapter } from "./types.js";
 
