@@ -11,7 +11,7 @@ Multi-tenant AI chatbot platform. Phases per `docs/chatbot-platform-implementati
 | P2 | Chat pipeline + model + one tool | ✅ complete |
 | P3 | Abuse protection | ✅ complete |
 | P4 | Marketing site + tenant portal v1 | ✅ complete |
-| RF | Review-findings remediation (AI-DLC, `fix/review-findings`) | 🚧 in progress (U8/9) |
+| RF | Review-findings remediation (AI-DLC, `fix/review-findings`) | ✅ complete (U1–U9) |
 
 ## Gate checklist (each phase)
 tests green → reviewer subagent pass → conventional commit → PROGRESS update.
@@ -97,6 +97,16 @@ Docs: `aidlc-docs/`. Scope: Tiers 0–2 + all UI (see `aidlc-docs/inception/reve
 - Verify: **108 tests green** (unaffected); `deploy.yml` + CFN template valid YAML; typecheck + lint clean.
 - Reviewer: adversarial pass on all 7 points — **no findings ≥80**; confirmed OIDC scoping correct + tighter, sync ordering has no missing-asset window, prune preserves headers (mtime skip), smoke gate can't false-pass, debug gating correct, no fake SRI. Applied its sub-threshold note (smoke test now retries on 4xx, not just 5xx).
 - Extensions: SECURITY-13 (CI/CD integrity — env-scoped OIDC; SRI partial+documented) ✅ · RESILIENCY-04 (version-redeploy rollback) ✅ · RESILIENCY-06 (post-deploy health check) ✅ · RESILIENCY-15 (smoke gate + rollback runbook) ✅.
+
+### U9 gate — Test backfill + tenant-access guard ✅ (final unit)
+- **2.1** App-layer **tenant-access guard** (`assertTenantId` in `packages/shared/src/tenant.ts`): rejects empty/`#`/`*`/`/`/whitespace/control/over-length ids (allows the minted `t_<ulid>` + Cognito forms). Applied to **every** tenant-scoped DDB function in `ddb.ts` + `admin-ddb.ts`. Defense-in-depth over the `LeadingKeys` IAM (not a substitute — documented). Added `assertSessionId` for the composite-key `sessionId` half (admin transcript route takes it from a URL path segment).
+- **2.4 / 3.27–3.31** Test backfill: `tenant.test.ts` (guard + fast-check PBT), `rotation.test.ts` (site-key/grace-key lifecycle: new/old/no-op/isolation), `rate-limit.test.ts` (cap-boundary PBT that faithfully simulates the conditional counter — catches `<`→`<=`; + window/TTL invariant PBT), `api-security.test.ts` (CDK template: KMS ECC_NIST_P256 SIGN_VERIFY, admin routes have JWT authorizer, `/health`+`/v1/widget` don't, LeadingKeys present), isolation negatives (malformed tenant/session ids never reach DDB — asserts 0 command calls).
+- Tests: **128 green** (+20). Both E2E green; typecheck + lint + synth clean.
+- Reviewer: found 2 real gaps (unguarded `sessionId` on an attacker-controlled admin path; `ensureUserTenant`/`ensureTenantConfig` missing the guard despite the DoD) + 1 overstated test (cap-boundary was a string match) — **all three fixed** (sessionId guard + `ensureTenantConfig` guard + a behavior-simulating cap-boundary PBT) and re-verified. Confirmed the regex never rejects a legitimate tenant.
+- Extensions: SECURITY-08 (authz/IDOR — guard + negative cross-tenant assertions across every handler path) ✅ · PBT-02/03/07/08 (DER→JOSE round-trip [U2], tenant-id + rate-limiter invariants, domain generators, seed/shrink) ✅.
+
+## RF remediation summary (U1–U9, all committed on `fix/review-findings`)
+All in-scope findings (Tiers 0–2 + all UI) from the two review loops are remediated, each gated (design → code → tests → reviewer-subagent pass → conventional commit). Deferred (documented in `aidlc-docs/inception/reverse-engineering/review-findings.md`): most Tier-3 scale/ops items, full billing/Stripe, GDPR deletion (2.11). Final state: **128 unit tests + both Playwright E2E green; typecheck, lint, cdk synth clean**.
 
 ## Open WARNs / TODOs
 - [ops] `dynamodb:LeadingKeys: TENANT#*` bounds session+chat Lambdas to tenant partitions but is NOT per-tenant isolation — enforced in app code (JWT/site-key derive tenantId server-side; message PK embeds tenantId). Per-tenant IAM needs request-scoped creds; revisit later. (reviewer P1 #4, P2 #3)

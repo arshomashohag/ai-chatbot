@@ -17,6 +17,8 @@ import {
   sessionPk,
   siteKeyGsi,
   KB_MAX_ENTRIES,
+  assertTenantId,
+  assertSessionId,
   type KbEntry,
   type KbEntryInput,
   type BusinessBasics,
@@ -90,6 +92,7 @@ export async function ensureUserTenant(
  * failure so repeated calls are a safe no-op (idempotent).
  */
 async function ensureTenantConfig(tenantId: string): Promise<string> {
+  assertTenantId(tenantId);
   try {
     await client.send(
       new PutCommand({
@@ -129,6 +132,7 @@ export interface FullConfig {
 }
 
 export async function getConfig(tenantId: string): Promise<FullConfig> {
+  assertTenantId(tenantId);
   const res = await client.send(
     new GetCommand({
       TableName: tableName(),
@@ -149,6 +153,7 @@ export async function saveBasics(
   tenantId: string,
   basics: BusinessBasics
 ): Promise<void> {
+  assertTenantId(tenantId);
   await client.send(
     new UpdateCommand({
       TableName: tableName(),
@@ -166,6 +171,7 @@ export async function saveAppearance(
   tenantId: string,
   appearance: Appearance
 ): Promise<void> {
+  assertTenantId(tenantId);
   await client.send(
     new UpdateCommand({
       TableName: tableName(),
@@ -187,6 +193,7 @@ export async function saveBusinessProfile(
   tenantId: string,
   profile: string
 ): Promise<void> {
+  assertTenantId(tenantId);
   await client.send(
     new UpdateCommand({
       TableName: tableName(),
@@ -198,6 +205,7 @@ export async function saveBusinessProfile(
 }
 
 export async function listKb(tenantId: string): Promise<KbEntry[]> {
+  assertTenantId(tenantId);
   const res = await client.send(
     new QueryCommand({
       TableName: tableName(),
@@ -218,6 +226,7 @@ export async function addKb(
   tenantId: string,
   entry: KbEntryInput
 ): Promise<KbEntry> {
+  assertTenantId(tenantId);
   const existing = await listKb(tenantId);
   if (existing.length >= KB_MAX_ENTRIES) {
     throw new Error("kb_limit_reached");
@@ -233,6 +242,7 @@ export async function addKb(
 }
 
 export async function deleteKb(tenantId: string, id: string): Promise<void> {
+  assertTenantId(tenantId);
   await client.send(
     new DeleteCommand({
       TableName: tableName(),
@@ -246,6 +256,7 @@ export async function issueSiteKey(
   plaintext: string,
   graceSeconds: number
 ): Promise<void> {
+  assertTenantId(tenantId);
   const hash = hashSiteKey(plaintext);
   const now = Math.floor(Date.now() / 1000);
 
@@ -299,6 +310,7 @@ export async function listSessions(
   tenantId: string,
   limit = 50
 ): Promise<SessionSummary[]> {
+  assertTenantId(tenantId);
   const res = await client.send(
     new QueryCommand({
       TableName: tableName(),
@@ -323,6 +335,8 @@ export async function getTranscript(
   tenantId: string,
   sessionId: string
 ): Promise<StoredMessage[]> {
+  assertTenantId(tenantId);
+  assertSessionId(sessionId);
   const res = await client.send(
     new QueryCommand({
       TableName: tableName(),

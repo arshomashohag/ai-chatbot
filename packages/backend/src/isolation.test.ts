@@ -175,3 +175,65 @@ describe("admin-route isolation: tenant derived from Cognito sub, KB/sessions te
     expect(pk).toBe("USER#sub_a");
   });
 });
+
+describe("tenant-access guard: malformed tenant ids never reach DynamoDB (2.1)", () => {
+  beforeEach(() => {
+    ddb.reset();
+    process.env.TABLE_NAME = "platform-test";
+    ddb.on(QueryCommand).resolves({ Items: [] });
+    ddb.on(GetCommand).resolves({ Item: undefined });
+    ddb.on(BatchWriteCommand).resolves({});
+    ddb.on(UpdateCommand).resolves({});
+  });
+
+  // A bug (or attacker-influenced input) that let a wildcard/partition-escape
+  // tenant id through would broaden the query past a single tenant. The guard
+  // throws BEFORE any DDB call, so no such key is ever issued.
+  const bad = ["*", "TENANT#other", "a#b", "", "  ", "a/b"];
+
+  it("queryHistory rejects wildcard/injection ids before any DDB call", async () => {
+    const { queryHistory } = await import("./lib/ddb.js");
+    for (const t of bad) {
+      await expect(queryHistory(t, "s1")).rejects.toThrow(/invalid tenant id/);
+    }
+    expect(ddb.commandCalls(QueryCommand).length).toBe(0);
+  });
+
+  it("getTenantConfig rejects malformed ids before any DDB call", async () => {
+    const { getTenantConfig } = await import("./lib/ddb.js");
+    for (const t of bad) {
+      await expect(getTenantConfig(t)).rejects.toThrow(/invalid tenant id/);
+    }
+    expect(ddb.commandCalls(GetCommand).length).toBe(0);
+  });
+
+  it("listKb (admin path) rejects malformed ids before any DDB call", async () => {
+    const { listKb } = await import("./lib/admin-ddb.js");
+    for (const t of bad) {
+      await expect(listKb(t)).rejects.toThrow(/invalid tenant id/);
+    }
+    expect(ddb.commandCalls(QueryCommand).length).toBe(0);
+  });
+
+  // sessionId is the other half of the composite key — the admin transcript
+  // route takes it from a raw URL path segment, so it must be guarded too.
+  it("getTranscript rejects a malformed sessionId before any DDB call", async () => {
+    const { getTranscript } = await import("./lib/admin-ddb.js");
+    for (const s of ["*", "a#b", "SESSION#x", "a/b", ""]) {
+      await expect(getTranscript("tenant_a", s)).rejects.toThrow(
+        /invalid session id/
+      );
+    }
+    expect(ddb.commandCalls(QueryCommand).length).toBe(0);
+  });
+
+  it("queryHistory rejects a malformed sessionId before any DDB call", async () => {
+    const { queryHistory } = await import("./lib/ddb.js");
+    for (const s of ["*", "a#b", "a b"]) {
+      await expect(queryHistory("tenant_a", s)).rejects.toThrow(
+        /invalid session id/
+      );
+    }
+    expect(ddb.commandCalls(QueryCommand).length).toBe(0);
+  });
+});

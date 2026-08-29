@@ -59,9 +59,9 @@
 
 ## Current Status
 - **Lifecycle Phase**: INCEPTION
-- **Current Stage**: CONSTRUCTION — U1 (Chat data-layer): code complete, reviewer pass running
-- **Next Stage**: U1 commit → U2 (Widget JWT hardening + Origin binding)
-- **Status**: In progress
+- **Current Stage**: CONSTRUCTION complete — all 9 units committed on `fix/review-findings`
+- **Next Stage**: Build and Test (final verification) → ready for PR
+- **Status**: Remediation complete; awaiting user direction on PR/merge
 - **Branch**: fix/review-findings
 
 ## Construction Progress
@@ -73,7 +73,7 @@
 - [x] U6 Portal React+MUI — FD + full rewrite + 104 tests (+3 RTL) + BOTH E2E green + XSS gate + typecheck/lint clean + reviewer pass (fixed 1 Critical snackbar-memo + 1 Important CI grep gate) + committed
 - [x] U7 Marketing + CSP + design-system — FD + code + 108 tests green (+4 CSP) + both E2E green + typecheck/lint/synth clean + reviewer pass (fixed 1 Critical CSS-cascade collision reverting AA fix) + committed. Wired ?mode=signup into portal AuthFlow.
 - [x] U8 Deploy pipeline safety — FD + code + 108 tests green + valid YAML + typecheck/lint clean + reviewer pass (no findings; applied smoke-retry hardening) + committed
-- [ ] U9 Tests + tenant-access guard  ← next (final unit)
+- [x] U9 Tests + tenant-access guard — FD + code (assertTenantId + assertSessionId guards on all tenant/session-scoped DDB fns; tenant/rotation/rate-limiter PBT + CDK security template tests + isolation negatives) + 128 tests green (+20) + both E2E green + typecheck/lint/synth clean + reviewer pass (fixed 2 gaps: sessionId guard + ensureTenantConfig; strengthened cap-boundary PBT) + committed. **ALL 9 UNITS COMPLETE.**
 
 ## Findings Inventory (source of work)
 See `aidlc-docs/inception/reverse-engineering/review-findings.md` — the consolidated, deduplicated findings from both review loops. This is the master issue list this workflow will remediate.

@@ -15,7 +15,9 @@ import {
   sessionPk,
   sessionSk,
   messageSk,
-  usageSk
+  usageSk,
+  assertTenantId,
+  assertSessionId
 } from "@platform/shared";
 import type { StoredMessage } from "@platform/shared";
 
@@ -114,6 +116,7 @@ export async function findTenantBySiteKeyHash(
 export async function getTenantConfig(
   tenantId: string
 ): Promise<TenantConfig | null> {
+  assertTenantId(tenantId);
   const res = await client.send(
     new GetCommand({
       TableName: tableName(),
@@ -133,6 +136,8 @@ export async function putSession(params: {
   createdAt: number;
   ttl: number;
 }): Promise<void> {
+  assertTenantId(params.tenantId);
+  assertSessionId(params.sessionId);
   await client.send(
     new PutCommand({
       TableName: tableName(),
@@ -160,6 +165,7 @@ export async function searchProducts(
   query: string,
   limit = 5
 ): Promise<Product[]> {
+  assertTenantId(tenantId);
   const res = await client.send(
     new QueryCommand({
       TableName: tableName(),
@@ -188,6 +194,8 @@ export async function queryHistory(
   sessionId: string,
   limit = 20
 ): Promise<StoredMessage[]> {
+  assertTenantId(tenantId);
+  assertSessionId(sessionId);
   // Fetch the most recent `limit` messages (ScanIndexForward:false = descending
   // sort key), then reverse to chronological order for the model. Without this
   // the query returns the OLDEST `limit` items and the bot loses recent context.
@@ -246,6 +254,8 @@ export async function persistMessages(params: {
   sessionId: string;
   messages: StoredMessage[];
 }): Promise<void> {
+  assertTenantId(params.tenantId);
+  assertSessionId(params.sessionId);
   if (params.messages.length === 0) return;
   // One monotonic ULID per message → globally unique, chronologically sortable
   // sort keys. Replaces the old MSG#<iso>#<idx> scheme where same-millisecond
@@ -287,6 +297,7 @@ export async function incrementUsage(params: {
   tokensIn: number;
   tokensOut: number;
 }): Promise<void> {
+  assertTenantId(params.tenantId);
   await client.send(
     new UpdateCommand({
       TableName: tableName(),
@@ -310,6 +321,7 @@ export async function getUsage(
   tenantId: string,
   month: string
 ): Promise<number> {
+  assertTenantId(tenantId);
   const res = await client.send(
     new GetCommand({
       TableName: tableName(),
@@ -325,6 +337,7 @@ export async function getUsage(
  * Idempotent.
  */
 export async function tripKillSwitch(tenantId: string): Promise<void> {
+  assertTenantId(tenantId);
   await client.send(
     new UpdateCommand({
       TableName: tableName(),

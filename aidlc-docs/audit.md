@@ -147,3 +147,19 @@ Complete audit trail of user inputs and AI responses. Newest entries appended at
 **Context**: CONSTRUCTION — U8 Code Generation + gate (about to commit)
 
 ---
+
+## CONSTRUCTION U9 — Test backfill + tenant-access guard (final unit)
+**Timestamp**: 2026-08-29T06:40:00Z
+**User Input**: "continue"
+**AI Response**: U8 committed (ad68ac0). U9 FD written. Added assertTenantId (packages/shared/src/tenant.ts) applied to every tenant-scoped DDB fn (2.1); backfilled tests (2.4, 3.27-3.31): tenant PBT, rotation lifecycle, rate-limiter cap-boundary + window PBT, CDK api-security template assertions, isolation negatives. Tests: 126 green. Reviewer subagent: found 2 real gaps (unguarded sessionId on attacker-controlled admin transcript path → getTranscript; ensureUserTenant/ensureTenantConfig missing guard vs DoD) + 1 overstated test (cap-boundary was a string match). FIXED all three: added assertSessionId + applied to getTranscript/queryHistory/persistMessages/putSession; guarded ensureTenantConfig; rewrote cap-boundary PBT to simulate the conditional counter (catches <→<=); added sessionId isolation negatives. Tests: 128 green (+20). Both E2E green; typecheck+lint+synth clean. PROGRESS.md U9 gate + RF summary written.
+**Context**: CONSTRUCTION — U9 complete; ALL 9 UNITS DONE
+
+---
+
+## Remediation Complete
+**Timestamp**: 2026-08-29T06:45:00Z
+**User Input**: (n/a)
+**AI Response**: All 9 gated units (U1–U9) committed on `fix/review-findings`. All in-scope review-loop findings (Tiers 0–2 + all UI) remediated. Final: 128 unit tests + both Playwright E2E green; typecheck, lint, cdk synth clean. Deferred items documented in review-findings.md. Awaiting user direction on PR/merge.
+**Context**: AI-DLC CONSTRUCTION phase complete
+
+---
