@@ -230,7 +230,10 @@ export class ApiStack extends Stack {
         TABLE_NAME: table.tableName,
         CDN_ORIGIN: config.subdomains.cdn,
         CHAT_ORIGIN: config.subdomains.chat,
-        API_ORIGIN: config.subdomains.api
+        API_ORIGIN: config.subdomains.api,
+        // The tenant portal (a different subdomain) calls the admin API
+        // cross-origin, so the handler reflects this exact origin in CORS.
+        PORTAL_ORIGIN: config.subdomains.app
       }
     });
     // Admin operations span USER# (profile lookup) and TENANT# (config, KB,
@@ -259,6 +262,15 @@ export class ApiStack extends Stack {
       methods: [HttpMethod.GET, HttpMethod.POST, HttpMethod.PUT, HttpMethod.DELETE],
       integration: new HttpLambdaIntegration("AdminIntegration", admin),
       authorizer
+    });
+    // CORS preflight for the admin routes MUST be unauthenticated — the browser
+    // sends OPTIONS without the Authorization header, so it can't carry the JWT
+    // the authorizer requires. A separate OPTIONS route (no authorizer) lets the
+    // handler answer the preflight with the right CORS headers.
+    this.httpApi.addRoutes({
+      path: "/v1/admin/{proxy+}",
+      methods: [HttpMethod.OPTIONS],
+      integration: new HttpLambdaIntegration("AdminOptionsIntegration", admin)
     });
 
     new CfnOutput(this, "UserPoolId", { value: userPool.userPoolId });

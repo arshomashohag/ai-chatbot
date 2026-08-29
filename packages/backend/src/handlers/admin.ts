@@ -1,4 +1,8 @@
-import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
+import type {
+  APIGatewayProxyHandlerV2WithJWTAuthorizer,
+  APIGatewayProxyEventV2WithJWTAuthorizer,
+  APIGatewayProxyStructuredResultV2
+} from "aws-lambda";
 import {
   BusinessBasics,
   Appearance,
@@ -9,6 +13,7 @@ import {
 } from "@platform/shared";
 import { generateSiteKey } from "@platform/shared/node";
 import { json, error } from "../lib/http.js";
+import { normalizeOrigin } from "../lib/origin.js";
 import { tenantForCaller, AdminAuthError } from "../lib/admin-auth.js";
 import {
   getConfig,
@@ -51,9 +56,41 @@ async function computeSetupComplete(tenantId: string): Promise<boolean> {
   return hasDomain && hasProfile && hasKb;
 }
 
+// The portal is served from a different subdomain than the API, so admin
+// responses need CORS. Reflect only our own portal origin (never the raw
+// request Origin) so this authenticated API isn't opened to arbitrary sites.
+function adminCors(requestOrigin: string | undefined): Record<string, string> {
+  const portal = process.env.PORTAL_ORIGIN
+    ? `https://${process.env.PORTAL_ORIGIN}`
+    : "";
+  const normalized = normalizeOrigin(requestOrigin);
+  if (!portal || normalized !== normalizeOrigin(portal)) return {};
+  return {
+    "access-control-allow-origin": portal,
+    "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
+    "access-control-allow-headers": "content-type,authorization",
+    "access-control-max-age": "600",
+    vary: "Origin"
+  };
+}
+
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
   event
 ) => {
+  const cors = adminCors(event.headers?.origin ?? event.headers?.Origin);
+  const res = await route(event);
+  // Add CORS to every response without touching the 21 call sites.
+  return { ...res, headers: { ...res.headers, ...cors } };
+};
+
+async function route(
+  event: APIGatewayProxyEventV2WithJWTAuthorizer
+): Promise<APIGatewayProxyStructuredResultV2> {
+  // CORS preflight is unauthenticated (browsers send OPTIONS without the JWT).
+  if (event.requestContext.http.method === "OPTIONS") {
+    return { statusCode: 204, body: "" };
+  }
+
   let tenantId: string;
   try {
     tenantId = await tenantForCaller(event);

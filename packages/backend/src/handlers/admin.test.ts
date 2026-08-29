@@ -106,3 +106,55 @@ describe("admin handler", () => {
     expect((vals[":h"] as string).length).toBe(64);
   });
 });
+
+describe("admin CORS (portal is a different subdomain)", () => {
+  const PORTAL = "chatbot-app-dev.example.com";
+  const PORTAL_URL = `https://${PORTAL}`;
+
+  function evtWithOrigin(method: string, origin: string | undefined, sub?: string) {
+    return {
+      rawPath: "/v1/admin/config",
+      headers: origin ? { origin } : {},
+      requestContext: {
+        http: { method },
+        authorizer: sub ? { jwt: { claims: { sub } } } : {}
+      }
+    } as never;
+  }
+
+  beforeEach(() => {
+    ddb.reset();
+    process.env.TABLE_NAME = "platform-test";
+    process.env.PORTAL_ORIGIN = PORTAL;
+  });
+
+  it("answers the OPTIONS preflight with 204 + CORS, no auth needed", async () => {
+    const res = (await handler(
+      evtWithOrigin("OPTIONS", PORTAL_URL),
+      ctx,
+      cb
+    )) as { statusCode: number; headers?: Record<string, string> };
+    expect(res.statusCode).toBe(204);
+    expect(res.headers?.["access-control-allow-origin"]).toBe(PORTAL_URL);
+    expect(res.headers?.["access-control-allow-headers"]).toContain("authorization");
+  });
+
+  it("reflects the portal origin on a real (403) response", async () => {
+    const res = (await handler(
+      evtWithOrigin("GET", PORTAL_URL, undefined),
+      ctx,
+      cb
+    )) as { statusCode: number; headers?: Record<string, string> };
+    expect(res.statusCode).toBe(403); // no sub → forbidden, but still CORS'd
+    expect(res.headers?.["access-control-allow-origin"]).toBe(PORTAL_URL);
+  });
+
+  it("does NOT emit CORS for a non-portal origin (authenticated API not opened up)", async () => {
+    const res = (await handler(
+      evtWithOrigin("OPTIONS", "https://evil.example.com"),
+      ctx,
+      cb
+    )) as { statusCode: number; headers?: Record<string, string> };
+    expect(res.headers?.["access-control-allow-origin"]).toBeUndefined();
+  });
+});
