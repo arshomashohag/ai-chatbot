@@ -35,16 +35,19 @@ function snippet(siteKey: string): string {
   const cdn = process.env.CDN_ORIGIN ?? "chatbot-cdn-dev.example.com";
   const chat = process.env.CHAT_ORIGIN ?? "chatbot-chat-dev.example.com";
   const api = process.env.API_ORIGIN ?? "chatbot-api-dev.example.com";
-  // `crossorigin` so an SRI `integrity` attribute can be added later without a
-  // snippet-format change. Full SRI is deferred: it needs a versioned widget
-  // filename (widget.js is mutable and the hash would change every release,
-  // and this snippet is generated server-side, decoupled from the widget build).
+  // NOTE: no `crossorigin` attribute. A plain <script src> loads and executes
+  // with no CORS requirement. Adding `crossorigin="anonymous"` (as we did while
+  // prepping for SRI) puts the browser in CORS mode, and since the widget CDN
+  // doesn't return Access-Control-Allow-Origin for the script, the browser
+  // fetches it but REFUSES TO EXECUTE it — the widget silently fails to load on
+  // the embedding site. SRI is deferred anyway (needs a versioned filename), so
+  // there is no `integrity` attr to pair `crossorigin` with. Re-add both
+  // together only when the widget ships a content-hashed filename.
   return (
     `<script src="https://${cdn}/widget.js" ` +
     `data-site-key="${siteKey}" ` +
     `data-chat-origin="https://${chat}" ` +
-    `data-api-base="https://${api}" ` +
-    `crossorigin="anonymous"></script>`
+    `data-api-base="https://${api}"></script>`
   );
 }
 

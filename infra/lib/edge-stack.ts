@@ -82,7 +82,8 @@ export class EdgeStack extends Stack {
       zone,
       domain: config.subdomains.cdn,
       bucket: this.widgetBucket,
-      responseHeadersPolicy: this.makeSecurityHeaders("CdnSec", cdnCsp, false),
+      // publicCors=true: widget.js is loaded cross-origin by every tenant site.
+      responseHeadersPolicy: this.makeSecurityHeaders("CdnSec", cdnCsp, false, true),
       webAclId: cdnWaf.attrArn,
       rootObject: "widget.js"
     });
@@ -92,7 +93,8 @@ export class EdgeStack extends Stack {
       domain: config.subdomains.chat,
       bucket: this.chatBucket,
       // framable=true → no X-Frame-Options; framing controlled by CSP.
-      responseHeadersPolicy: this.makeSecurityHeaders("ChatSec", chatCsp, true),
+      // publicCors=true: the chat surface + its assets are loaded cross-origin.
+      responseHeadersPolicy: this.makeSecurityHeaders("ChatSec", chatCsp, true, true),
       webAclId: cdnWaf.attrArn,
       rootObject: "chat.html"
     });
@@ -167,9 +169,26 @@ export class EdgeStack extends Stack {
   private makeSecurityHeaders(
     id: string,
     csp: string,
-    framable: boolean
+    framable: boolean,
+    publicCors = false
   ): ResponseHeadersPolicy {
     return new ResponseHeadersPolicy(this, id, {
+      // Public assets (widget.js, the chat iframe) are loaded cross-origin from
+      // arbitrary tenant sites, so allow any origin. This makes the response
+      // carry Access-Control-Allow-Origin, which the browser requires to execute
+      // a `crossorigin`/module script and to read cross-origin fetches. It does
+      // NOT weaken anything: these are public, unauthenticated static assets.
+      ...(publicCors
+        ? {
+            corsBehavior: {
+              accessControlAllowOrigins: ["*"],
+              accessControlAllowHeaders: ["*"],
+              accessControlAllowMethods: ["GET", "HEAD", "OPTIONS"],
+              accessControlAllowCredentials: false,
+              originOverride: true
+            }
+          }
+        : {}),
       securityHeadersBehavior: {
         contentTypeOptions: { override: true },
         // The chat surface must be framable by tenant sites; framing is
