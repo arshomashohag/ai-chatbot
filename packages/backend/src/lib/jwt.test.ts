@@ -3,7 +3,7 @@ import { mockClient } from "aws-sdk-client-mock";
 import { KMSClient, SignCommand } from "@aws-sdk/client-kms";
 import { createSign, generateKeyPairSync, createVerify } from "node:crypto";
 import { signWidgetJwt } from "./jwt.js";
-import { JWT_ALG } from "@platform/shared";
+import { JWT_ALG, JWT_ISS, JWT_AUD } from "@platform/shared";
 
 const kms = mockClient(KMSClient);
 
@@ -27,6 +27,8 @@ describe("KMS ES256 JWT", () => {
         tenant_id: "t1",
         session_id: "s1",
         origin: "https://a.com",
+        iss: JWT_ISS,
+        aud: JWT_AUD,
         iat: now,
         exp: now + 3600
       },
@@ -34,9 +36,9 @@ describe("KMS ES256 JWT", () => {
     );
 
     const [h, p, sig] = token.split(".");
-    expect(JSON.parse(Buffer.from(h!, "base64url").toString()).alg).toBe(
-      JWT_ALG
-    );
+    const parsedHeader = JSON.parse(Buffer.from(h!, "base64url").toString());
+    expect(parsedHeader.alg).toBe(JWT_ALG);
+    expect(parsedHeader.kid).toBe("key-1");
 
     const raw = Buffer.from(sig!, "base64url");
     expect(raw.length).toBe(64);

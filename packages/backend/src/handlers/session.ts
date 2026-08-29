@@ -5,6 +5,8 @@ import {
   SessionResponse,
   WIDGET_ERROR_CODES,
   MAX_SESSION_TTL_SECONDS,
+  JWT_ISS,
+  JWT_AUD,
   type WidgetClaims
 } from "@platform/shared";
 import { hashSiteKey } from "@platform/shared/node";
@@ -68,6 +70,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     tenant_id: tenant.tenantId,
     session_id: sessionId,
     origin: matchedOrigin,
+    iss: JWT_ISS,
+    aud: JWT_AUD,
     iat: now,
     exp
   };

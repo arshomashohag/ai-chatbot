@@ -28,6 +28,14 @@ Docs: `aidlc-docs/`. Scope: Tiers 0–2 + all UI (see `aidlc-docs/inception/reve
 - Reviewer: pass confirmed ULID ordering, retry-loop partial-failure correctness, monotonic-factory concurrency, idempotency skip-path (agent hit an API error before finishing the last 2 paths; both covered by passing tests incl. PBT).
 - Extensions: SECURITY-15 (persist throws, not silent) ✅ · PBT-03/07/08 (chunk + key ordering) ✅ · RESILIENCY-10 N/A (timeouts → U4).
 
+### U2 gate — Widget JWT hardening + Origin binding ✅
+- **1.4** JWT public-key cache is now a `Map` keyed by `keyId` with a 10-min TTL (was a single global that ignored keyId → broke rotation/revocation). `sign` emits `kid`; `verify` enforces `kid === keyId`, plus required `iss`/`aud` claims (constants `JWT_ISS`/`JWT_AUD`).
+- **1.2** Chat handler binds the bearer token to its origin: rejects (401) when the request Origin ≠ `claims.origin` (both normalized scheme+host). No-Origin server-side replay is rejected.
+- **4.7** Chat app only accepts an `https` `apiBase` (`isHttpsUrl`), preventing token redirection to a downgraded/attacker endpoint.
+- Tests: **70 green** (+9: kid mismatch, wrong iss/aud, cross-key rejection, keyId-scoped cache, DER→JOSE fast-check PBT, chat origin-binding 401/pass). typecheck + lint clean; widget 1.58KB gz.
+- Reviewer: adversarial pass on all 6 scrutiny areas — **no findings ≥80 confidence**; confirmed fail-closed kid/iss/aud, no cache poisoning, origin can't be forged, no legit-token exfil path. Added origin normalization on the compare per a sub-threshold note.
+- Extensions: SECURITY-08 (full token validation: sig+exp+ttl+kid+iss+aud+origin) ✅ · SECURITY-11 (defense in depth) ✅ · SECURITY-15 (fail-closed) ✅ · PBT-02 (DER→JOSE round-trip) ✅.
+
 ## Open WARNs / TODOs
 - [ops] `dynamodb:LeadingKeys: TENANT#*` bounds session+chat Lambdas to tenant partitions but is NOT per-tenant isolation — enforced in app code (JWT/site-key derive tenantId server-side; message PK embeds tenantId). Per-tenant IAM needs request-scoped creds; revisit later. (reviewer P1 #4, P2 #3)
 - [P3] `search_products` DDB Query is capped at Limit=200 then filtered in-memory; move to a proper query/index if catalogs grow. (reviewer P2 #5)

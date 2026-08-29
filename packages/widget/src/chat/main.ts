@@ -17,6 +17,15 @@ function el<T extends HTMLElement>(id: string): T {
   return node as T;
 }
 
+function isHttpsUrl(value: unknown): boolean {
+  if (typeof value !== "string" || value === "") return false;
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function appendMessage(role: "user" | "bot", text: string): void {
   const div = document.createElement("div");
   div.className = `msg ${role}`;
@@ -124,9 +133,13 @@ window.addEventListener("message", (ev) => {
     const parsed = SessionResponse.pick({ branding: true }).safeParse({
       branding: session.branding
     });
-    if (parsed.success) {
+    // Only trust an https apiBase. This prevents a page that frames the chat
+    // and injects a session from redirecting the bearer token to an
+    // attacker-controlled (or downgraded http) endpoint.
+    const safeApiBase = isHttpsUrl(data.apiBase) ? String(data.apiBase) : "";
+    if (parsed.success && safeApiBase) {
       token = session.token;
-      apiBase = data.apiBase ?? "";
+      apiBase = safeApiBase;
       renderConnected(parsed.data.branding);
       return;
     }

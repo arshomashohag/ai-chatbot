@@ -17,6 +17,7 @@ import {
 } from "../lib/rate-limit.js";
 import { listKb } from "../lib/admin-ddb.js";
 import { assembleSystemPrompt } from "../lib/prompt-assembly.js";
+import { normalizeOrigin } from "../lib/origin.js";
 import { tenantPk } from "@platform/shared";
 
 const FRIENDLY_DEGRADE =
@@ -41,6 +42,18 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       return error(401, "unauthorized", "Invalid or expired session");
     }
     throw e;
+  }
+
+  // Bind the bearer token to the origin it was minted for. A token captured
+  // from an allowed page and replayed from another origin (or a no-Origin
+  // server-side client) is rejected — the widget is browser-only and always
+  // sends Origin on its cross-origin POST. Normalize both sides so the compare
+  // is scheme+host only (claims.origin was normalized at mint time).
+  const requestOrigin = normalizeOrigin(
+    event.headers?.origin ?? event.headers?.Origin
+  );
+  if (!requestOrigin || requestOrigin !== claims.origin) {
+    return error(401, "unauthorized", "Invalid or expired session");
   }
 
   const parsed = ChatMessageRequest.safeParse(

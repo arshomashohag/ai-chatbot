@@ -39,7 +39,11 @@ export async function signWidgetJwt(
   claims: WidgetClaims,
   keyId: string
 ): Promise<string> {
-  const header = b64url(JSON.stringify({ alg: JWT_ALG, typ: "JWT" }));
+  // `kid` binds the token to the signing key so the verifier can select the
+  // right public key and reject tokens from any other key (safe rotation).
+  const header = b64url(
+    JSON.stringify({ alg: JWT_ALG, typ: "JWT", kid: keyId })
+  );
   const payload = b64url(JSON.stringify(claims));
   const signingInput = `${header}.${payload}`;
   const res = await kms.send(

@@ -91,3 +91,11 @@ Complete audit trail of user inputs and AI responses. Newest entries appended at
 **Context**: CONSTRUCTION — U1 Code Generation + gate (about to commit)
 
 ---
+
+## CONSTRUCTION U2 — Widget JWT hardening + Origin binding
+**Timestamp**: 2026-08-29T02:00:00Z
+**User Input**: "move on"
+**AI Response**: U1 committed (148f222). U2 Functional Design written. Implemented: kid header + keyId-scoped TTL Map cache + kid/iss/aud enforcement (1.4); chat-handler Origin binding with normalization (1.2); widget https apiBase validation (4.7). Tests: 70 green (+9 incl. DER→JOSE fast-check PBT). typecheck+lint+widget-size clean. Reviewer subagent: adversarial pass, no findings ≥80 confidence; applied one sub-threshold hardening (normalize both sides of origin compare). PROGRESS.md U2 gate written. Committing.
+**Context**: CONSTRUCTION — U2 Code Generation + gate (about to commit)
+
+---
