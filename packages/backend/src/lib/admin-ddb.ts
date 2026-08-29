@@ -17,6 +17,8 @@ import {
   sessionPk,
   siteKeyGsi,
   KB_MAX_ENTRIES,
+  assertTenantId,
+  assertSessionId,
   type KbEntry,
   type KbEntryInput,
   type BusinessBasics,
@@ -46,41 +48,78 @@ export async function getUserTenantId(sub: string): Promise<string | null> {
   return (res.Item?.tenantId as string) ?? null;
 }
 
+/**
+ * Provision a user's profile + tenant config. Idempotent under partial
+ * failure: the CONFIG put is attempted independently of the profile check, so
+ * a Cognito trigger retry that runs after the profile was written (but before
+ * the config was) still creates the missing config instead of returning early
+ * and leaving the user pointed at a nonexistent tenant.
+ */
 export async function ensureUserTenant(
   sub: string,
   email: string
 ): Promise<string> {
   const existing = await getUserTenantId(sub);
-  if (existing) return existing;
-  const tenantId = `t_${ulid().toLowerCase()}`;
-  await client.send(
-    new PutCommand({
-      TableName: tableName(),
-      Item: { PK: userPk(sub), SK: profileSk(), tenantId, email },
-      ConditionExpression: "attribute_not_exists(PK)"
-    })
-  );
-  await client.send(
-    new PutCommand({
-      TableName: tableName(),
-      Item: {
-        PK: tenantPk(tenantId),
-        SK: configSk(),
-        tenantId,
-        status: "active",
-        killSwitch: false,
-        model: "claude-haiku-4-5",
-        allowedOrigins: [],
-        setupComplete: false,
-        branding: {
-          displayName: "Assistant",
-          greeting: "Hi! How can I help?",
-          color: "#4f46e5"
-        }
-      },
-      ConditionExpression: "attribute_not_exists(PK)"
-    })
-  );
+  // Reuse an existing tenantId if the profile is already present; otherwise
+  // mint one. Either way we still ensure the CONFIG exists below.
+  const tenantId = existing ?? `t_${ulid().toLowerCase()}`;
+
+  if (!existing) {
+    try {
+      await client.send(
+        new PutCommand({
+          TableName: tableName(),
+          Item: { PK: userPk(sub), SK: profileSk(), tenantId, email },
+          ConditionExpression: "attribute_not_exists(PK)"
+        })
+      );
+    } catch (e) {
+      // A concurrent invocation already wrote the profile; re-read its tenantId
+      // so we ensure the config for the winning tenant, not a discarded one.
+      if ((e as { name?: string }).name === "ConditionalCheckFailedException") {
+        const winner = await getUserTenantId(sub);
+        if (winner) return ensureTenantConfig(winner);
+      }
+      throw e;
+    }
+  }
+
+  return ensureTenantConfig(tenantId);
+}
+
+/**
+ * Create the tenant CONFIG item if absent. Swallows the conditional-check
+ * failure so repeated calls are a safe no-op (idempotent).
+ */
+async function ensureTenantConfig(tenantId: string): Promise<string> {
+  assertTenantId(tenantId);
+  try {
+    await client.send(
+      new PutCommand({
+        TableName: tableName(),
+        Item: {
+          PK: tenantPk(tenantId),
+          SK: configSk(),
+          tenantId,
+          status: "active",
+          killSwitch: false,
+          model: "claude-haiku-4-5",
+          allowedOrigins: [],
+          setupComplete: false,
+          branding: {
+            displayName: "Assistant",
+            greeting: "Hi! How can I help?",
+            color: "#6d5ae6"
+          }
+        },
+        ConditionExpression: "attribute_not_exists(PK)"
+      })
+    );
+  } catch (e) {
+    if ((e as { name?: string }).name !== "ConditionalCheckFailedException") {
+      throw e;
+    }
+  }
   return tenantId;
 }
 
@@ -93,6 +132,7 @@ export interface FullConfig {
 }
 
 export async function getConfig(tenantId: string): Promise<FullConfig> {
+  assertTenantId(tenantId);
   const res = await client.send(
     new GetCommand({
       TableName: tableName(),
@@ -113,6 +153,7 @@ export async function saveBasics(
   tenantId: string,
   basics: BusinessBasics
 ): Promise<void> {
+  assertTenantId(tenantId);
   await client.send(
     new UpdateCommand({
       TableName: tableName(),
@@ -130,6 +171,7 @@ export async function saveAppearance(
   tenantId: string,
   appearance: Appearance
 ): Promise<void> {
+  assertTenantId(tenantId);
   await client.send(
     new UpdateCommand({
       TableName: tableName(),
@@ -151,6 +193,7 @@ export async function saveBusinessProfile(
   tenantId: string,
   profile: string
 ): Promise<void> {
+  assertTenantId(tenantId);
   await client.send(
     new UpdateCommand({
       TableName: tableName(),
@@ -162,6 +205,7 @@ export async function saveBusinessProfile(
 }
 
 export async function listKb(tenantId: string): Promise<KbEntry[]> {
+  assertTenantId(tenantId);
   const res = await client.send(
     new QueryCommand({
       TableName: tableName(),
@@ -182,6 +226,7 @@ export async function addKb(
   tenantId: string,
   entry: KbEntryInput
 ): Promise<KbEntry> {
+  assertTenantId(tenantId);
   const existing = await listKb(tenantId);
   if (existing.length >= KB_MAX_ENTRIES) {
     throw new Error("kb_limit_reached");
@@ -197,6 +242,7 @@ export async function addKb(
 }
 
 export async function deleteKb(tenantId: string, id: string): Promise<void> {
+  assertTenantId(tenantId);
   await client.send(
     new DeleteCommand({
       TableName: tableName(),
@@ -210,6 +256,7 @@ export async function issueSiteKey(
   plaintext: string,
   graceSeconds: number
 ): Promise<void> {
+  assertTenantId(tenantId);
   const hash = hashSiteKey(plaintext);
   const now = Math.floor(Date.now() / 1000);
 
@@ -263,6 +310,7 @@ export async function listSessions(
   tenantId: string,
   limit = 50
 ): Promise<SessionSummary[]> {
+  assertTenantId(tenantId);
   const res = await client.send(
     new QueryCommand({
       TableName: tableName(),
@@ -287,6 +335,8 @@ export async function getTranscript(
   tenantId: string,
   sessionId: string
 ): Promise<StoredMessage[]> {
+  assertTenantId(tenantId);
+  assertSessionId(sessionId);
   const res = await client.send(
     new QueryCommand({
       TableName: tableName(),

@@ -45,6 +45,13 @@ export const AdminConfig = z.object({
 });
 export type AdminConfig = z.infer<typeof AdminConfig>;
 
+// Input schema for the business-profile write. Zod-bounded (max 4000) so the
+// handler no longer relies on an ad-hoc typeof check + .slice (finding 3.12).
+export const ProfileInput = z.object({
+  businessProfile: z.string().max(4000)
+});
+export type ProfileInput = z.infer<typeof ProfileInput>;
+
 export const IssueKeyResponse = z.object({
   siteKey: z.string(),
   snippet: z.string()

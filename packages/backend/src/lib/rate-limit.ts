@@ -31,9 +31,13 @@ export async function allow(
   limit: Limit,
   nowMs: number
 ): Promise<boolean> {
-  const window = Math.floor(nowMs / 1000 / limit.windowSec);
+  const nowSec = Math.floor(nowMs / 1000);
+  const window = Math.floor(nowSec / limit.windowSec);
   const sk = `${skPrefix}#${window}`;
-  const ttl = (window + 2) * limit.windowSec;
+  // TTL as an explicit epoch-seconds value ~2 windows ahead. (The old
+  // `(window + 2) * windowSec` only equalled this by the window-index≈epoch
+  // coincidence and broke for other windowSec values.)
+  const ttl = nowSec + limit.windowSec * 2;
   try {
     await client.send(
       new UpdateCommand({
@@ -51,5 +55,32 @@ export async function allow(
       return false;
     }
     throw e;
+  }
+}
+
+/**
+ * Like `allow`, but on an infrastructure error (throttle/timeout — anything
+ * other than the cap being hit) it FAILS OPEN and returns true. The rate
+ * limiter is an abuse dampener, not a security boundary: its unavailability
+ * must not deny service. Spend is independently bounded by the monthly quota
+ * (which fails closed). A genuine cap hit still returns false (throttled).
+ */
+export async function allowFailOpen(
+  pk: string,
+  skPrefix: string,
+  limit: Limit,
+  nowMs: number
+): Promise<boolean> {
+  try {
+    return await allow(pk, skPrefix, limit, nowMs);
+  } catch (e) {
+    console.warn(
+      JSON.stringify({
+        event: "rate_limit_degraded",
+        sk: skPrefix,
+        error: e instanceof Error ? e.message : "unknown"
+      })
+    );
+    return true;
   }
 }

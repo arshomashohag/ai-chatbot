@@ -3,6 +3,7 @@ import {
   BusinessBasics,
   Appearance,
   KbEntryInput,
+  ProfileInput,
   IssueKeyResponse,
   type AdminConfig
 } from "@platform/shared";
@@ -28,11 +29,16 @@ function snippet(siteKey: string): string {
   const cdn = process.env.CDN_ORIGIN ?? "chatbot-cdn-dev.example.com";
   const chat = process.env.CHAT_ORIGIN ?? "chatbot-chat-dev.example.com";
   const api = process.env.API_ORIGIN ?? "chatbot-api-dev.example.com";
+  // `crossorigin` so an SRI `integrity` attribute can be added later without a
+  // snippet-format change. Full SRI is deferred: it needs a versioned widget
+  // filename (widget.js is mutable and the hash would change every release,
+  // and this snippet is generated server-side, decoupled from the widget build).
   return (
     `<script src="https://${cdn}/widget.js" ` +
     `data-site-key="${siteKey}" ` +
     `data-chat-origin="https://${chat}" ` +
-    `data-api-base="https://${api}"></script>`
+    `data-api-base="https://${api}" ` +
+    `crossorigin="anonymous"></script>`
   );
 }
 
@@ -60,7 +66,12 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
 
   const method = event.requestContext.http.method;
   const path = event.rawPath.replace(/\/+$/, "");
-  const body = event.body ? JSON.parse(event.body) : {};
+  let body: unknown;
+  try {
+    body = event.body ? JSON.parse(event.body) : {};
+  } catch {
+    return error(400, "invalid_request", "Malformed body");
+  }
 
   if (method === "GET" && path.endsWith("/v1/admin/config")) {
     const cfg = await getConfig(tenantId);
@@ -89,10 +100,9 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
   }
 
   if (method === "PUT" && path.endsWith("/v1/admin/profile")) {
-    if (typeof body.businessProfile !== "string") {
-      return error(400, "invalid_request", "Invalid profile");
-    }
-    await saveBusinessProfile(tenantId, body.businessProfile.slice(0, 4000));
+    const parsed = ProfileInput.safeParse(body);
+    if (!parsed.success) return error(400, "invalid_request", "Invalid profile");
+    await saveBusinessProfile(tenantId, parsed.data.businessProfile);
     return json(200, { ok: true });
   }
 

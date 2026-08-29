@@ -6,6 +6,11 @@ on:
       env:
         required: true
         type: string
+      debug:
+        description: Print OIDC token claims for troubleshooting.
+        required: false
+        type: boolean
+        default: false
     secrets:
       AWS_DEPLOY_ROLE:
         required: true
@@ -44,7 +49,10 @@ jobs:
       # Debug: print the exact claims AWS matches the role trust policy against.
       # Compare `sub` / `aud` here to the trust policy in
       # infra/bootstrap/github-deploy-role.yaml. No secrets are printed.
+      # Off by default (only when the caller passes debug: true) so it doesn't
+      # run on the steady-state / prod critical path.
       - name: Debug OIDC token claims
+        if: ${{ inputs.debug }}
         env:
           ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE }}
         run: |
@@ -118,14 +126,39 @@ jobs:
           get() { aws cloudformation describe-stacks --stack-name "$stack" \
             --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
 
-          aws s3 sync packages/widget/dist      "s3://$(get WidgetBucketName)"    --delete
-          aws s3 sync packages/widget/dist-chat "s3://$(get ChatBucketName)"      --delete
-          aws s3 sync packages/marketing/dist   "s3://$(get MarketingBucketName)" --delete
-          aws s3 sync packages/dashboard/dist   "s3://$(get PortalBucketName)"    --delete
+          IMMUTABLE="max-age=31536000,immutable"
+          NOCACHE="no-cache"
 
-          # Invalidate each distribution so CloudFront serves the freshly synced
-          # assets immediately instead of cached copies. Distribution ids come
-          # from the Edge stack outputs — nothing hardcoded.
+          # Cache-safe publish per surface, in three ordered phases so a client
+          # mid-session never requests an asset that's been deleted before its
+          # replacement is up:
+          #   1) upload content-hashed /assets/* as IMMUTABLE, NO --delete
+          #   2) upload the mutable entrypoints (HTML / widget.js) as no-cache
+          #   3) invalidate the entrypoints
+          #   4) prune old files with --delete (after invalidation)
+          publish() {
+            local src="$1" bucket="$2" entry="$3"
+            # 1) immutable hashed assets first (add-only)
+            aws s3 sync "$src" "s3://$bucket" \
+              --exclude "$entry" --cache-control "$IMMUTABLE"
+            # 2) mutable entrypoint(s), always revalidated
+            aws s3 sync "$src" "s3://$bucket" \
+              --exclude "*" --include "$entry" --cache-control "$NOCACHE"
+          }
+          # Prune only removes files absent from the source; it must NOT re-set
+          # cache-control (that was set correctly in phases 1-2, and s3 sync
+          # skips unchanged files, so no re-upload happens here).
+          prune() { aws s3 sync "$1" "s3://$2" --delete; }
+
+          W="$(get WidgetBucketName)"; C="$(get ChatBucketName)"
+          M="$(get MarketingBucketName)"; P="$(get PortalBucketName)"
+
+          publish packages/widget/dist      "$W" "widget.js"
+          publish packages/widget/dist-chat "$C" "chat.html"
+          publish packages/marketing/dist   "$M" "index.html"
+          publish packages/dashboard/dist   "$P" "index.html"
+
+          # 3) invalidate so CloudFront serves the fresh entrypoints immediately.
           for out in CdnDistributionId ChatDistributionId \
                      MarketingDistributionId PortalDistributionId; do
             dist="$(get "$out")"
@@ -133,3 +166,37 @@ jobs:
             aws cloudfront create-invalidation \
               --distribution-id "$dist" --paths '/*' >/dev/null
           done
+
+          # 4) prune assets no longer referenced, AFTER invalidation so any
+          # client still on the previous HTML already fetched its chunks.
+          prune packages/widget/dist      "$W"
+          prune packages/widget/dist-chat "$C"
+          prune packages/marketing/dist   "$M"
+          prune packages/dashboard/dist   "$P"
+
+      - name: Smoke test the deployment
+        env:
+          ENV: ${{ inputs.env }}
+        run: |
+          api="ChatbotPlatform-${ENV}-Api"
+          out() { aws cloudformation describe-stacks --stack-name "$1" \
+            --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text; }
+          API_ORIGIN="$(out "$api" ApiOrigin)"
+
+          # Retry on ANY non-200 (not just 5xx) — right after a deploy the API
+          # can transiently return 403/404 while DNS / API Gateway / IAM
+          # propagate. Poll until 200 or the attempts run out.
+          echo "Smoke: GET ${API_ORIGIN}/health"
+          code="000"
+          for attempt in 1 2 3 4 5 6; do
+            code=$(curl -sS -o /tmp/health.json -w "%{http_code}" \
+              "${API_ORIGIN}/health" || echo 000)
+            echo "attempt ${attempt}: status=${code}"
+            [ "$code" = "200" ] && break
+            sleep 10
+          done
+          echo "final status=${code} body=$(cat /tmp/health.json 2>/dev/null)"
+          if [ "$code" != "200" ]; then
+            echo "::error::Post-deploy smoke test failed (/health returned ${code}). Roll back by re-running the deploy from the last good commit SHA."
+            exit 1
+          fi

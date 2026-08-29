@@ -104,6 +104,12 @@ function boot(): void {
     'A8.5 8.5 0 1 1 21 11.5z"></path></svg>';
   shadow.appendChild(bubble);
 
+  const chatIcon = bubble.innerHTML;
+  const closeIcon =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M18 6 6 18M6 6l12 12"></path></svg>';
+
   let frame: HTMLIFrameElement | null = null;
   let session: Awaited<ReturnType<typeof handshake>> | null = null;
 
@@ -115,12 +121,36 @@ function boot(): void {
     );
   }
 
+  function setOpen(open: boolean): void {
+    frame?.classList.toggle("open", open);
+    bubble.setAttribute("aria-expanded", String(open));
+    bubble.setAttribute("aria-label", open ? "Close chat" : "Open chat");
+    bubble.innerHTML = open ? closeIcon : chatIcon;
+    if (!open) bubble.focus();
+  }
+
   window.addEventListener("message", (ev) => {
     if (ev.origin !== settings.chatOrigin) return;
     if (ev.source !== frame?.contentWindow) return;
-    if (ev.data?.type === "platform:ready") postToFrame();
+    if (ev.data?.type === "platform:ready") {
+      // A `platform:ready` after a FAILED session is a retry ("Try again"):
+      // re-run the handshake before re-posting, otherwise we'd just re-send the
+      // cached failed session and the user is stuck in the unavailable state.
+      if (!session || session.ok === false) {
+        void handshake(settings).then((s) => {
+          session = s;
+          postToFrame();
+        });
+      } else {
+        postToFrame();
+      }
+    }
+    // The chat requested close (header X or Esc) — hide the frame and return
+    // focus to the launcher. Critical on mobile where the frame is fullscreen.
+    if (ev.data?.type === "platform:close") setOpen(false);
   });
 
+  bubble.setAttribute("aria-expanded", "false");
   bubble.addEventListener("click", async () => {
     if (!frame) {
       frame = document.createElement("iframe");
@@ -133,7 +163,7 @@ function boot(): void {
       session = await handshake(settings);
       postToFrame();
     }
-    frame.classList.toggle("open");
+    setOpen(!frame.classList.contains("open"));
   });
 
   document.body.appendChild(host);

@@ -42,21 +42,33 @@ export class EdgeStack extends Stack {
 
     const cdnWaf = makeWebAcl(this, "CdnWaf", "CLOUDFRONT", config.env);
 
-    const securityHeaders = new ResponseHeadersPolicy(this, "SecHeaders", {
-      securityHeadersBehavior: {
-        contentTypeOptions: { override: true },
-        frameOptions: { frameOption: HeadersFrameOption.DENY, override: true },
-        strictTransportSecurity: {
-          accessControlMaxAge: Duration.days(365),
-          includeSubdomains: true,
-          override: true
-        },
-        referrerPolicy: {
-          referrerPolicy: "strict-origin-when-cross-origin" as never,
-          override: true
-        }
-      }
-    });
+    // Per-surface CSP. Built from config.subdomains so it stays env-independent
+    // (no hardcoded origins). script-src is never 'unsafe-inline'; 'unsafe-inline'
+    // is limited to style-src because MUI/emotion and the static HTML inject
+    // runtime <style> and nonces aren't practical for pre-built static assets.
+    const api = `https://${config.subdomains.api}`;
+    const cdn = `https://${config.subdomains.cdn}`;
+    const chat = `https://${config.subdomains.chat}`;
+    const fontsCss = "https://fonts.googleapis.com";
+    const fontsFiles = "https://fonts.gstatic.com";
+    const cognito = `https://cognito-idp.${config.region}.amazonaws.com`;
+    const base = "default-src 'none'; object-src 'none'; base-uri 'none'";
+
+    const cdnCsp = `${base}; script-src 'self'; frame-ancestors 'none'`;
+    // The chat surface is DESIGNED to be framed by the widget on any tenant site
+    // — so frame-ancestors *, and NO X-Frame-Options (DENY would break it).
+    const chatCsp =
+      `${base}; script-src 'self'; style-src 'self' 'unsafe-inline' ${fontsCss}; ` +
+      `font-src ${fontsFiles}; connect-src 'self' ${api}; img-src 'self' data:; ` +
+      `frame-ancestors *`;
+    const marketingCsp =
+      `${base}; script-src 'self' ${cdn}; style-src 'self' 'unsafe-inline' ${fontsCss}; ` +
+      `font-src ${fontsFiles}; connect-src 'self' ${api}; frame-src ${chat}; ` +
+      `img-src 'self' data:; frame-ancestors 'none'`;
+    const portalCsp =
+      `${base}; script-src 'self'; style-src 'self' 'unsafe-inline' ${fontsCss}; ` +
+      `font-src ${fontsFiles}; connect-src 'self' ${api} ${cognito}; ` +
+      `img-src 'self' data:; frame-ancestors 'none'`;
 
     this.marketingBucket = this.privateBucket(
       "MarketingBucket",
@@ -70,7 +82,7 @@ export class EdgeStack extends Stack {
       zone,
       domain: config.subdomains.cdn,
       bucket: this.widgetBucket,
-      responseHeadersPolicy: securityHeaders,
+      responseHeadersPolicy: this.makeSecurityHeaders("CdnSec", cdnCsp, false),
       webAclId: cdnWaf.attrArn,
       rootObject: "widget.js"
     });
@@ -79,7 +91,8 @@ export class EdgeStack extends Stack {
       zone,
       domain: config.subdomains.chat,
       bucket: this.chatBucket,
-      responseHeadersPolicy: securityHeaders,
+      // framable=true → no X-Frame-Options; framing controlled by CSP.
+      responseHeadersPolicy: this.makeSecurityHeaders("ChatSec", chatCsp, true),
       webAclId: cdnWaf.attrArn,
       rootObject: "chat.html"
     });
@@ -88,7 +101,11 @@ export class EdgeStack extends Stack {
       zone,
       domain: config.subdomains.site,
       bucket: this.marketingBucket,
-      responseHeadersPolicy: securityHeaders,
+      responseHeadersPolicy: this.makeSecurityHeaders(
+        "MarketingSec",
+        marketingCsp,
+        false
+      ),
       webAclId: cdnWaf.attrArn,
       rootObject: "index.html",
       spa: true
@@ -98,7 +115,11 @@ export class EdgeStack extends Stack {
       zone,
       domain: config.subdomains.app,
       bucket: this.portalBucket,
-      responseHeadersPolicy: securityHeaders,
+      responseHeadersPolicy: this.makeSecurityHeaders(
+        "PortalSec",
+        portalCsp,
+        false
+      ),
       webAclId: cdnWaf.attrArn,
       rootObject: "index.html",
       spa: true
@@ -140,6 +161,41 @@ export class EdgeStack extends Stack {
       enforceSSL: true,
       removalPolicy: RemovalPolicy.RETAIN,
       autoDeleteObjects: false
+    });
+  }
+
+  private makeSecurityHeaders(
+    id: string,
+    csp: string,
+    framable: boolean
+  ): ResponseHeadersPolicy {
+    return new ResponseHeadersPolicy(this, id, {
+      securityHeadersBehavior: {
+        contentTypeOptions: { override: true },
+        // The chat surface must be framable by tenant sites; framing is
+        // governed by the CSP frame-ancestors directive instead of XFO.
+        ...(framable
+          ? {}
+          : {
+              frameOptions: {
+                frameOption: HeadersFrameOption.DENY,
+                override: true
+              }
+            }),
+        strictTransportSecurity: {
+          accessControlMaxAge: Duration.days(365),
+          includeSubdomains: true,
+          override: true
+        },
+        referrerPolicy: {
+          referrerPolicy: "strict-origin-when-cross-origin" as never,
+          override: true
+        },
+        contentSecurityPolicy: {
+          contentSecurityPolicy: csp,
+          override: true
+        }
+      }
     });
   }
 

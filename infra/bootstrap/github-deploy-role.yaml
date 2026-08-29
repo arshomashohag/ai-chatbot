@@ -24,12 +24,12 @@ Parameters:
     Default: ""
     Description: >
       Optional override for the OIDC `sub` this role trusts. Leave blank to
-      use a sensible default per env (dev/staging = pushes to main, prod =
-      the `prod` GitHub environment).
+      use the default: `environment:<env>` for every environment, so the role
+      can only be assumed by a run that has entered the matching GitHub
+      Environment (which carries any required-reviewer / branch protection).
 
 Conditions:
   HasCustomSubject: !Not [!Equals [!Ref SubjectClaim, ""]]
-  IsProd: !Equals [!Ref EnvName, "prod"]
 
 Resources:
   # Assumes the GitHub OIDC provider already exists in this account
@@ -51,13 +51,15 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
+                # Trust only runs that have entered the matching GitHub
+                # Environment (enforced cryptographically at the trust boundary,
+                # not just the advisory `environment:` on the job). This is
+                # tighter than `ref:refs/heads/main`, which any workflow on main
+                # could satisfy. Applies to dev/staging AND prod uniformly.
                 token.actions.githubusercontent.com:sub: !If
                   - HasCustomSubject
                   - !Ref SubjectClaim
-                  - !If
-                    - IsProd
-                    - !Sub repo:${GitHubOrg}/${GitHubRepo}:environment:prod
-                    - !Sub repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/main
+                  - !Sub repo:${GitHubOrg}/${GitHubRepo}:environment:${EnvName}
       Policies:
         - PolicyName: cdk-deploy
           PolicyDocument:

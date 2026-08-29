@@ -8,7 +8,10 @@ export type SessionRequest = z.infer<typeof SessionRequest>;
 export const Branding = z.object({
   displayName: z.string(),
   greeting: z.string(),
-  color: z.string()
+  color: z.string(),
+  // Optional tenant-specific starter prompts (e.g. from KB titles). When absent
+  // the widget shows no suggestions rather than generic hardcoded ones.
+  suggestedPrompts: z.array(z.string()).max(3).optional()
 });
 export type Branding = z.infer<typeof Branding>;
 
