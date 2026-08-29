@@ -11,9 +11,22 @@ Multi-tenant AI chatbot platform. Phases per `docs/chatbot-platform-implementati
 | P2 | Chat pipeline + model + one tool | ✅ complete |
 | P3 | Abuse protection | ✅ complete |
 | P4 | Marketing site + tenant portal v1 | ✅ complete |
+| RF | Review-findings remediation (AI-DLC, `fix/review-findings`) | 🚧 in progress (U1/9) |
 
 ## Gate checklist (each phase)
 tests green → reviewer subagent pass → conventional commit → PROGRESS update.
+
+## Review-findings remediation (AI-DLC run)
+Docs: `aidlc-docs/`. Scope: Tiers 0–2 + all UI (see `aidlc-docs/inception/reverse-engineering/review-findings.md`). 9 gated units.
+
+### U1 gate — Chat data-layer correctness ✅
+- **0.1** `queryHistory` fetches newest `limit` (`ScanIndexForward:false`) then reverses to chronological — no more amnesia.
+- **0.2** message sort keys are monotonic ULIDs (`MSG#<ulid>`), collision-free across same-ms writes; `persistMessages` chunks BatchWrite to ≤25 and retries `UnprocessedItems` with backoff, throwing on final failure.
+- **0.4** `ensureUserTenant` idempotent: CONFIG always ensured (swallows `ConditionalCheckFailedException`), race path re-reads winning tenant — no orphaned tenants. Seeded default color `#4f46e5`→`#6d5ae6`.
+- **3.10** `persistMessages` increments session `messageCount` (user/assistant only) for a truthful portal sessions view.
+- Tests: **61 green** (+14: `ddb.test.ts` incl. fast-check PBT for `chunk` + `messageSk` ordering; `admin-ddb.test.ts` idempotency incl. race; isolation updated). typecheck + lint clean.
+- Reviewer: pass confirmed ULID ordering, retry-loop partial-failure correctness, monotonic-factory concurrency, idempotency skip-path (agent hit an API error before finishing the last 2 paths; both covered by passing tests incl. PBT).
+- Extensions: SECURITY-15 (persist throws, not silent) ✅ · PBT-03/07/08 (chunk + key ordering) ✅ · RESILIENCY-10 N/A (timeouts → U4).
 
 ## Open WARNs / TODOs
 - [ops] `dynamodb:LeadingKeys: TENANT#*` bounds session+chat Lambdas to tenant partitions but is NOT per-tenant isolation — enforced in app code (JWT/site-key derive tenantId server-side; message PK embeds tenantId). Per-tenant IAM needs request-scoped creds; revisit later. (reviewer P1 #4, P2 #3)

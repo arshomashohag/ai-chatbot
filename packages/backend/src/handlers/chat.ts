@@ -108,16 +108,15 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     });
   }
 
-  const baseIso = new Date().toISOString();
+  const month = new Date().toISOString().slice(0, 7);
   await persistMessages({
     tenantId: claims.tenant_id,
     sessionId: claims.session_id,
-    baseIso,
     messages: result.newMessages
   });
   await incrementUsage({
     tenantId: claims.tenant_id,
-    month: baseIso.slice(0, 7),
+    month,
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut
   });

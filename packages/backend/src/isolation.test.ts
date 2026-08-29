@@ -66,7 +66,6 @@ describe("cross-tenant isolation: every access for tenant A stays under TENANT#t
     await persistMessages({
       tenantId: A,
       sessionId: "s1",
-      baseIso: "2026-01-01T00:00:00.000Z",
       messages: [{ role: "user", content: "hi" }]
     });
     const req = ddb.commandCalls(BatchWriteCommand)[0]!.args[0].input;
@@ -76,6 +75,12 @@ describe("cross-tenant isolation: every access for tenant A stays under TENANT#t
       expect(pk.startsWith(`TENANT#${A}#`)).toBe(true);
       expect(pk).not.toContain(B);
     }
+    // The messageCount increment must also stay under tenant A's partition.
+    const countUpdate = ddb
+      .commandCalls(UpdateCommand)
+      .map((c) => c.args[0].input)
+      .find((i) => i.UpdateExpression?.includes("messageCount"));
+    expect(countUpdate?.Key!.PK).toBe(tenantPk(A));
   });
 
   it("incrementUsage writes only under tenant A", async () => {
