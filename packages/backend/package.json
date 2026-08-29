@@ -16,7 +16,6 @@
     "@aws-sdk/lib-dynamodb": "^3.717.0",
     "@aws-sdk/util-dynamodb": "^3.717.0",
     "@platform/shared": "workspace:*",
-    "ulid": "^2.3.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

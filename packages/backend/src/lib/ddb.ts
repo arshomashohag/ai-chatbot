@@ -7,7 +7,7 @@ import {
   BatchWriteCommand,
   UpdateCommand
 } from "@aws-sdk/lib-dynamodb";
-import { monotonicFactory } from "ulid";
+import { monotonicUlid } from "./ulid.js";
 import {
   siteKeyGsi,
   tenantPk,
@@ -23,7 +23,7 @@ import type { StoredMessage } from "@platform/shared";
 
 // Monotonic ULIDs: lexicographically sortable and strictly increasing even
 // within the same millisecond, so message sort keys never collide or reorder.
-const nextMessageId = monotonicFactory();
+const nextMessageId = monotonicUlid();
 
 // DynamoDB caps BatchWrite at 25 items per request.
 const BATCH_MAX = 25;
