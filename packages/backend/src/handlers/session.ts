@@ -13,43 +13,61 @@ import { hashSiteKey } from "@platform/shared/node";
 import { json, error } from "../lib/http.js";
 import { findTenantBySiteKeyHash, putSession } from "../lib/ddb.js";
 import { listKb } from "../lib/admin-ddb.js";
-import { matchAllowedOrigin } from "../lib/origin.js";
+import { matchAllowedOrigin, normalizeOrigin } from "../lib/origin.js";
 import { signWidgetJwt } from "../lib/jwt.js";
 
 function corsHeaders(origin: string): Record<string, string> {
+  if (!origin) return {};
   return {
     "access-control-allow-origin": origin,
     "access-control-allow-methods": "POST,OPTIONS",
     "access-control-allow-headers": "content-type",
+    "access-control-max-age": "600",
     vary: "Origin"
   };
 }
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const origin = event.headers?.origin ?? event.headers?.Origin ?? "";
+  // Reflect the (normalized) request origin on EVERY response — including the
+  // 400/403 error paths and the OPTIONS preflight — so the embedding site's
+  // browser can actually read the response instead of seeing an opaque CORS
+  // failure. Reflecting only a well-formed origin (not a raw header) keeps this
+  // from echoing arbitrary/injected values. The security allowlisting still
+  // happens below via matchAllowedOrigin; CORS only governs readability.
+  const reflect = normalizeOrigin(origin) ?? "";
+  const cors = corsHeaders(reflect);
+
+  // Preflight: the browser sends OPTIONS with no body before the POST. Answer
+  // it directly — running the full handler on OPTIONS would 400 on the empty
+  // body and (previously) drop CORS, which is exactly what blocked the widget.
+  if (event.requestContext?.http?.method === "OPTIONS") {
+    return { statusCode: 204, headers: cors, body: "" };
+  }
 
   let body: unknown;
   try {
     body = JSON.parse(event.body ?? "{}");
   } catch {
-    return error(400, WIDGET_ERROR_CODES.INVALID_REQUEST, "Malformed body");
+    return error(400, WIDGET_ERROR_CODES.INVALID_REQUEST, "Malformed body", cors);
   }
   const parsed = SessionRequest.safeParse(body);
   if (!parsed.success) {
-    return error(400, WIDGET_ERROR_CODES.INVALID_REQUEST, "Invalid request");
+    return error(400, WIDGET_ERROR_CODES.INVALID_REQUEST, "Invalid request", cors);
   }
 
   const tenant = await findTenantBySiteKeyHash(
     hashSiteKey(parsed.data.siteKey)
   );
   if (!tenant) {
-    return error(403, WIDGET_ERROR_CODES.BAD_SITE_KEY, "Unknown site key");
+    return error(403, WIDGET_ERROR_CODES.BAD_SITE_KEY, "Unknown site key", cors);
   }
   if (tenant.status === "suspended") {
     return error(
       403,
       WIDGET_ERROR_CODES.TENANT_SUSPENDED,
-      "Tenant unavailable"
+      "Tenant unavailable",
+      cors
     );
   }
   const matchedOrigin = matchAllowedOrigin(origin, tenant.allowedOrigins);
@@ -57,7 +75,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     return error(
       403,
       WIDGET_ERROR_CODES.ORIGIN_NOT_ALLOWED,
-      "Origin not allowed"
+      "Origin not allowed",
+      cors
     );
   }
 
