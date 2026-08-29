@@ -43,6 +43,17 @@ Docs: `aidlc-docs/`. Scope: Tiers 0–2 + all UI (see `aidlc-docs/inception/reve
 - Reviewer: traced all paths — "correctly bounds runaway model spend", no findings ≥80. Overshoot bounded (≤60s cross-container cache + 600/min rate limit → a few thousand msgs vs 10k default).
 - Extensions: SECURITY-11 (abuse ceiling) ✅ · SECURITY-15 (fail-closed) ✅ · RESILIENCY-10 (graceful over-quota degrade) ✅ · PBT N/A (threshold compare).
 
+### U4 gate — Backend robustness ✅
+- **2.6** CORS now on **every** chat response (200/401/400/429/503/degrade/over-quota) + an OPTIONS preflight (204). `widgetCors` reflects only a `normalizeOrigin`'d origin (never raw) — browser can finally read error bodies.
+- **2.7** New `allowFailOpen` fails **open** on a rate-limiter infra error (dampener, not a boundary; quota fails closed) but still 429s on a real cap hit. `persistMessages`+`incrementUsage` wrapped so a storage/usage blip can't 500 an already-generated reply.
+- **3.8** Config-cache TTL 60s→10s → kill-switch/suspend honored within ~10s (also shrinks U3 cross-container overshoot).
+- **3.9** Guarded `JSON.parse` in chat + admin → clean 400 on malformed body.
+- **3.13** Rate-limiter TTL is now explicit epoch-seconds (`nowSec + windowSec*2`), no longer relying on the window-index≈epoch coincidence.
+- **3.12** (bonus) `/v1/admin/profile` validates via new `ProfileInput` zod schema (max 4000) instead of `typeof`+`.slice`.
+- Tests: **86 green** (+10: CORS on success+error, OPTIONS 204, malformed→400, persist-fail-still-200, usage-fail-still-200, fail-open true on infra error / false on cap, TTL epoch). typecheck + lint clean.
+- Reviewer: adversarial pass on all 7 questions — no findings ≥80; confirmed no CORS injection, no fail-open/closed gap, no runaway path.
+- Extensions: SECURITY-08 (CORS restricted to validated origin) ✅ · SECURITY-15 (fail-closed where it matters, guarded I/O, clean 400s) ✅ · RESILIENCY-10 (graceful degradation on infra errors) ✅ · PBT N/A (rate-limiter window PBT scheduled U9).
+
 ## Open WARNs / TODOs
 - [ops] `dynamodb:LeadingKeys: TENANT#*` bounds session+chat Lambdas to tenant partitions but is NOT per-tenant isolation — enforced in app code (JWT/site-key derive tenantId server-side; message PK embeds tenantId). Per-tenant IAM needs request-scoped creds; revisit later. (reviewer P1 #4, P2 #3)
 - [P3] `search_products` DDB Query is capped at Limit=200 then filtered in-memory; move to a proper query/index if catalogs grow. (reviewer P2 #5)

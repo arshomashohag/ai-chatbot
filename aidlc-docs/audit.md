@@ -107,3 +107,11 @@ Complete audit trail of user inputs and AI responses. Newest entries appended at
 **Context**: CONSTRUCTION — U3 Code Generation + gate (about to commit)
 
 ---
+
+## CONSTRUCTION U4 — Backend robustness
+**Timestamp**: 2026-08-29T03:00:00Z
+**User Input**: "continue to U4"
+**AI Response**: U3 committed (b95e513). U4 FD written. Implemented 2.6 (CORS on all chat responses + OPTIONS preflight, reflect-normalized-only), 2.7 (allowFailOpen fail-open + guarded persist/usage), 3.8 (config cache 60s→10s), 3.9 (guarded JSON.parse chat+admin), 3.13 (rate-limit TTL epoch-seconds), + bonus 3.12 (ProfileInput zod). Tests: 86 green (+10). typecheck+lint clean. Reviewer subagent: adversarial pass on 7 questions, no findings ≥80; confirmed no CORS injection, no fail-open/closed gap, no runaway. PROGRESS.md U4 gate written. Committing.
+**Context**: CONSTRUCTION — U4 Code Generation + gate (about to commit)
+
+---

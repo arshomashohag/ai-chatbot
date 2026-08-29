@@ -5,7 +5,10 @@ interface Entry {
   expiresAt: number;
 }
 
-const TTL_MS = 60_000;
+// 10s (was 60s) so a suspend / auto-kill-switch is honored within ~10s on warm
+// containers instead of up to a minute. Config items are tiny and cached, so
+// the extra GetItems are cheap.
+const TTL_MS = 10_000;
 const cache = new Map<string, Entry>();
 
 export async function cachedTenantConfig(

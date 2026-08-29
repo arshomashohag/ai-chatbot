@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
 import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { allow, SESSION_LIMIT } from "./rate-limit.js";
+import { allow, allowFailOpen, SESSION_LIMIT } from "./rate-limit.js";
 
 const ddb = mockClient(DynamoDBDocumentClient);
 
@@ -40,5 +40,37 @@ describe("fixed-window rate limiter", () => {
     await expect(
       allow("TENANT#t", "RL#T", SESSION_LIMIT, 0)
     ).rejects.toBeTruthy();
+  });
+
+  it("sets a TTL that is epoch-seconds ~2 windows in the future (3.13)", async () => {
+    ddb.on(UpdateCommand).resolves({});
+    const nowMs = 1_800_000_000_000; // fixed epoch ms
+    await allow("TENANT#t", "RL#S", SESSION_LIMIT, nowMs);
+    const input = ddb.commandCalls(UpdateCommand)[0]!.args[0].input;
+    const ttl = input.ExpressionAttributeValues![":ttl"] as number;
+    const nowSec = Math.floor(nowMs / 1000);
+    expect(ttl).toBe(nowSec + SESSION_LIMIT.windowSec * 2);
+    expect(ttl).toBeGreaterThan(nowSec);
+  });
+});
+
+describe("allowFailOpen", () => {
+  beforeEach(() => {
+    ddb.reset();
+    process.env.TABLE_NAME = "platform-test";
+  });
+
+  it("returns false (throttled) on a real cap hit", async () => {
+    ddb.on(UpdateCommand).rejects({ name: "ConditionalCheckFailedException" });
+    expect(await allowFailOpen("TENANT#t", "RL#S", SESSION_LIMIT, 0)).toBe(
+      false
+    );
+  });
+
+  it("fails OPEN (returns true) on an infrastructure error", async () => {
+    ddb.on(UpdateCommand).rejects({ name: "ProvisionedThroughputExceeded" });
+    expect(await allowFailOpen("TENANT#t", "RL#S", SESSION_LIMIT, 0)).toBe(
+      true
+    );
   });
 });

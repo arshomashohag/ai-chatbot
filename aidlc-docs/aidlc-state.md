@@ -68,8 +68,8 @@
 - [x] U1 Chat data-layer — FD + code + 61 tests green (+14) + typecheck/lint clean + reviewer pass + committed (148f222)
 - [x] U2 Widget JWT hardening + Origin binding — FD + code + 70 tests green (+9) + typecheck/lint/size clean + reviewer pass (no findings) + committed
 - [x] U3 Quota enforcement + auto kill-switch — FD + code + 76 tests green (+6) + typecheck/lint clean + reviewer pass (no findings) + committed
-- [ ] U4 Backend robustness  ← next
-- [ ] U5 Widget UX
+- [x] U4 Backend robustness — FD + code (2.6/2.7/3.8/3.9/3.13 + bonus 3.12) + 86 tests green (+10) + typecheck/lint clean + reviewer pass (no findings) + committed
+- [ ] U5 Widget UX  ← next
 - [ ] U6 Portal React+MUI
 - [ ] U7 Marketing + CSP + design-system
 - [ ] U8 Deploy pipeline safety

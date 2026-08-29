@@ -3,6 +3,7 @@ import {
   BusinessBasics,
   Appearance,
   KbEntryInput,
+  ProfileInput,
   IssueKeyResponse,
   type AdminConfig
 } from "@platform/shared";
@@ -60,7 +61,12 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
 
   const method = event.requestContext.http.method;
   const path = event.rawPath.replace(/\/+$/, "");
-  const body = event.body ? JSON.parse(event.body) : {};
+  let body: unknown;
+  try {
+    body = event.body ? JSON.parse(event.body) : {};
+  } catch {
+    return error(400, "invalid_request", "Malformed body");
+  }
 
   if (method === "GET" && path.endsWith("/v1/admin/config")) {
     const cfg = await getConfig(tenantId);
@@ -89,10 +95,9 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
   }
 
   if (method === "PUT" && path.endsWith("/v1/admin/profile")) {
-    if (typeof body.businessProfile !== "string") {
-      return error(400, "invalid_request", "Invalid profile");
-    }
-    await saveBusinessProfile(tenantId, body.businessProfile.slice(0, 4000));
+    const parsed = ProfileInput.safeParse(body);
+    if (!parsed.success) return error(400, "invalid_request", "Invalid profile");
+    await saveBusinessProfile(tenantId, parsed.data.businessProfile);
     return json(200, { ok: true });
   }
 

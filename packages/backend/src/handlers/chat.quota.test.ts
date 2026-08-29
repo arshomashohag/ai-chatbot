@@ -31,7 +31,7 @@ vi.mock("../lib/ddb.js", () => ({
   DEFAULT_MONTHLY_MESSAGE_LIMIT: 10_000
 }));
 vi.mock("../lib/rate-limit.js", () => ({
-  allow: (...a: unknown[]) => allowMock(...a),
+  allowFailOpen: (...a: unknown[]) => allowMock(...a),
   SESSION_LIMIT: 10,
   TENANT_LIMIT: 600
 }));
