@@ -87,6 +87,21 @@ export function AuthFlow({ onAuthenticated }: { onAuthenticated: () => void }) {
                 await login(v.email, v.password);
                 onAuthenticated();
               } catch (e) {
+                // An unverified user who tries to log in is routed straight to
+                // the verify step (email prefilled, a fresh code sent) instead
+                // of being dead-ended on the login screen.
+                if ((e as { name?: string })?.name === "UserNotConfirmedException") {
+                  setEmail(v.email);
+                  setMode("verify");
+                  setNotice({
+                    kind: "info",
+                    text: "Your email isn't verified yet — we've sent a new code."
+                  });
+                  void resendCode(v.email).catch(() => {
+                    /* best-effort; the user can use "Resend code" */
+                  });
+                  return;
+                }
                 setNotice({ kind: "error", text: mapAuthError(e) });
               }
             }}

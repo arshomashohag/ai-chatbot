@@ -15,7 +15,7 @@ vi.mock("../auth.js", () => ({
 }));
 
 import { AuthFlow } from "./AuthFlow.js";
-import { login } from "../auth.js";
+import { login, resendCode } from "../auth.js";
 
 function renderFlow() {
   return render(
@@ -62,6 +62,24 @@ describe("AuthFlow (4.1, 2.9 — stepped auth + client validation)", () => {
     expect(button.disabled).toBe(false);
     await userEvent.click(button);
     expect(login).toHaveBeenCalledWith("a@b.com", "Password1");
+  });
+
+  it("routes an unverified login to the verify step (email carried, code resent)", async () => {
+    // Cognito rejects an unconfirmed user with UserNotConfirmedException.
+    vi.mocked(login).mockRejectedValueOnce(
+      Object.assign(new Error("not confirmed"), {
+        name: "UserNotConfirmedException"
+      })
+    );
+    renderFlow();
+    await userEvent.type(screen.getByTestId("login-email"), "new@user.com");
+    await userEvent.type(screen.getByTestId("login-pass"), "Password1");
+    await userEvent.click(screen.getByTestId("login"));
+
+    // Advanced to the verify step (code field appears) and a fresh code sent.
+    expect(await screen.findByTestId("cf-code")).toBeTruthy();
+    expect(screen.getByTestId("confirm")).toBeTruthy();
+    expect(resendCode).toHaveBeenCalledWith("new@user.com");
   });
 
   it("switches to the signup form (single-purpose steps, not all-at-once)", async () => {
