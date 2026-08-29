@@ -69,8 +69,8 @@
 - [x] U2 Widget JWT hardening + Origin binding — FD + code + 70 tests green (+9) + typecheck/lint/size clean + reviewer pass (no findings) + committed
 - [x] U3 Quota enforcement + auto kill-switch — FD + code + 76 tests green (+6) + typecheck/lint clean + reviewer pass (no findings) + committed
 - [x] U4 Backend robustness — FD + code (2.6/2.7/3.8/3.9/3.13 + bonus 3.12) + 86 tests green (+10) + typecheck/lint clean + reviewer pass (no findings) + committed
-- [ ] U5 Widget UX  ← next
-- [ ] U6 Portal React+MUI
+- [x] U5 Widget UX — FD + code (0.3, 4.11–4.17) + 101 unit tests green (+13) + handshake E2E green + widget 1.71KB gz + typecheck/lint clean + reviewer pass (no findings) + committed. money-path E2E pre-existing baseline failure (dashboard mock), addressed in U6.
+- [ ] U6 Portal React+MUI  ← next (largest unit: framework migration)
 - [ ] U7 Marketing + CSP + design-system
 - [ ] U8 Deploy pipeline safety
 - [ ] U9 Tests + tenant-access guard

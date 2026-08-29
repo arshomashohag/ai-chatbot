@@ -115,3 +115,11 @@ Complete audit trail of user inputs and AI responses. Newest entries appended at
 **Context**: CONSTRUCTION — U4 Code Generation + gate (about to commit)
 
 ---
+
+## CONSTRUCTION U5 — Widget UX
+**Timestamp**: 2026-08-29T03:40:00Z
+**User Input**: "continue to U5"
+**AI Response**: U4 committed (3326eb7). U5 FD written. Implemented 0.3/4.11 (header close X + Esc + loader platform:close handling, aria-expanded, icon swap, focus return), 4.12 (preserve typed msg on fail), 4.13 (unavailable retry), 4.14 (config-driven suggestedPrompts from KB titles; contract + session handler + session Lambda base-table Query IAM), 4.15 (safe clickable links via splitLinks, overflow-wrap), 4.16 (aria-live log), 4.17 (contrastOk brand-color fallback). Extracted pure helpers to chat/util.ts; isSafeApiBase replaces isHttpsUrl (allows loopback http for E2E, preserves 4.7). Tests: 101 green (+13 util incl. contrast/links/apiBase; session suggestedPrompts). Handshake E2E green; widget 1.71KB gz. Discovered + fixed: session handler filter must reject non-string/whitespace KB titles (avoided [undefined] in zod array). Found money-path E2E fails on baseline too (pre-existing dashboard mock issue, not U5). Reviewer subagent: 7-point adversarial pass, no findings ≥80; applied sub-threshold punctuation-trim polish. PROGRESS.md U5 gate written. Committing.
+**Context**: CONSTRUCTION — U5 Code Generation + gate (about to commit)
+
+---

@@ -43,7 +43,12 @@ describe("session handler", () => {
     kms.reset();
     process.env.TABLE_NAME = "platform-test";
     process.env.JWT_KMS_KEY_ID = "key-abc";
-    ddb.on(QueryCommand).resolves({ Items: [TENANT_ITEM] });
+    // Route the two Query shapes: the GSI1 site-key lookup returns the tenant;
+    // the base-table KB query (for suggested prompts) returns none by default.
+    ddb.on(QueryCommand).callsFake((input) => {
+      if (input.IndexName === "GSI1") return { Items: [TENANT_ITEM] };
+      return { Items: [] };
+    });
     ddb.on(PutCommand).resolves({});
     kms.on(SignCommand).resolves({ Signature: fakeDerSig() });
   });
@@ -78,5 +83,37 @@ describe("session handler", () => {
     if (!res || typeof res === "string") throw new Error("bad result");
     expect(res.statusCode).toBe(403);
     expect(JSON.parse(res.body as string).error.code).toBe("bad_site_key");
+  });
+
+  it("seeds suggestedPrompts from enabled KB titles (4.14)", async () => {
+    ddb.on(QueryCommand).callsFake((input) => {
+      if (input.IndexName === "GSI1") return { Items: [TENANT_ITEM] };
+      return {
+        Items: [
+          { id: "1", type: "faq", title: "Return policy?", body: "b", enabled: true },
+          { id: "2", type: "faq", title: "Shipping?", body: "b", enabled: true },
+          { id: "3", type: "faq", title: "Disabled", body: "b", enabled: false }
+        ]
+      };
+    });
+    const res = await invoke("https://shop.example.com");
+    if (!res || typeof res === "string") throw new Error("bad result");
+    const parsed = SessionResponse.parse(JSON.parse(res.body as string));
+    expect(parsed.branding.suggestedPrompts).toEqual([
+      "Return policy?",
+      "Shipping?"
+    ]);
+  });
+
+  it("omits suggestedPrompts when the KB read fails (best-effort)", async () => {
+    ddb.on(QueryCommand).callsFake((input) => {
+      if (input.IndexName === "GSI1") return { Items: [TENANT_ITEM] };
+      throw new Error("kb query denied");
+    });
+    const res = await invoke("https://shop.example.com");
+    if (!res || typeof res === "string") throw new Error("bad result");
+    expect(res.statusCode).toBe(200);
+    const parsed = SessionResponse.parse(JSON.parse(res.body as string));
+    expect(parsed.branding.suggestedPrompts).toBeUndefined();
   });
 });

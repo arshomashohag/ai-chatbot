@@ -54,6 +54,20 @@ Docs: `aidlc-docs/`. Scope: Tiers 0–2 + all UI (see `aidlc-docs/inception/reve
 - Reviewer: adversarial pass on all 7 questions — no findings ≥80; confirmed no CORS injection, no fail-open/closed gap, no runaway path.
 - Extensions: SECURITY-08 (CORS restricted to validated origin) ✅ · SECURITY-15 (fail-closed where it matters, guarded I/O, clean 400s) ✅ · RESILIENCY-10 (graceful degradation on infra errors) ✅ · PBT N/A (rate-limiter window PBT scheduled U9).
 
+### U5 gate — Widget UX (vanilla) ✅
+- **0.3 / 4.11** Header close (X) button + Esc key both post `platform:close`; loader hides the frame, returns focus to the launcher, toggles `aria-expanded`, swaps the launcher icon. Mobile trap fixed.
+- **4.12** Failed send (429/5xx/network) restores the typed text so it isn't lost.
+- **4.13** Unavailable state offers a "Try again" button that re-handshakes.
+- **4.14** Hardcoded e-commerce prompts removed; `Branding.suggestedPrompts` (optional) seeded from up to 3 enabled KB titles (session handler, best-effort); widget renders none when absent. Session Lambda gained base-table `Query` (LeadingKeys `TENANT#*`).
+- **4.15** Bot links are clickable + XSS-safe (`splitLinks` → text nodes + `<a>` via textContent/href properties, http(s) only, `rel=noopener noreferrer`; trailing punctuation not swallowed); `.msg` gets `overflow-wrap`.
+- **4.16** `#log` is `role=log aria-live=polite` so replies are announced.
+- **4.17** `contrastOk` validates the tenant brand color vs white; falls back to `#6d5ae6` if unreadable.
+- Also `isSafeApiBase` (replaces isHttpsUrl): https OR loopback-http (local/E2E), rejects other http — preserves the U2 4.7 fix while unblocking E2E.
+- Tests: **101 green** (+13 widget `util.test`: contrastOk, splitLinks incl. javascript:/punctuation, isSafeApiBase; session suggestedPrompts + best-effort). Handshake E2E green. widget **1.71KB gz**. typecheck + lint clean.
+- Reviewer: adversarial pass on 7 points — no findings ≥80; confirmed XSS-safe link rendering, sound loopback exemption, validated postMessage, best-effort KB, correct contrast math, preserved E2E selectors. Applied the sub-threshold punctuation-trim polish.
+- Extensions: SECURITY (XSS-safe rendering) ✅ · SECURITY-08 (platform:close validated) ✅ · a11y (aria-live, aria-expanded, Esc, focus return) ✅ · PBT N/A (small-domain pure helpers example-tested).
+- NOTE: money-path E2E (dashboard flow) fails on the baseline too — pre-existing mock-dashboard issue, unrelated to U5; U6 (portal rewrite) addresses.
+
 ## Open WARNs / TODOs
 - [ops] `dynamodb:LeadingKeys: TENANT#*` bounds session+chat Lambdas to tenant partitions but is NOT per-tenant isolation — enforced in app code (JWT/site-key derive tenantId server-side; message PK embeds tenantId). Per-tenant IAM needs request-scoped creds; revisit later. (reviewer P1 #4, P2 #3)
 - [P3] `search_products` DDB Query is capped at Limit=200 then filtered in-memory; move to a proper query/index if catalogs grow. (reviewer P2 #5)

@@ -106,7 +106,10 @@ export class ApiStack extends Stack {
     // request-scoped credentials (revisit in a later phase).
     this.sessionFn.addToRolePolicy(
       new PolicyStatement({
-        actions: ["dynamodb:GetItem", "dynamodb:PutItem"],
+        // GetItem/PutItem for the session item; Query for reading KB titles to
+        // seed the widget's suggested prompts — all bounded to TENANT# by
+        // LeadingKeys (tenant derived server-side from the verified site key).
+        actions: ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"],
         resources: [table.tableArn],
         conditions: {
           "ForAllValues:StringLike": {

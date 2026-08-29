@@ -12,6 +12,7 @@ import {
 import { hashSiteKey } from "@platform/shared/node";
 import { json, error } from "../lib/http.js";
 import { findTenantBySiteKeyHash, putSession } from "../lib/ddb.js";
+import { listKb } from "../lib/admin-ddb.js";
 import { matchAllowedOrigin } from "../lib/origin.js";
 import { signWidgetJwt } from "../lib/jwt.js";
 
@@ -87,11 +88,26 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     ttl: exp
   });
 
+  // Seed up to 3 suggested prompts from the tenant's enabled KB titles so the
+  // widget shows relevant starters instead of generic hardcoded ones. Best
+  // effort — a KB read failure must not fail session creation.
+  let suggestedPrompts: string[] | undefined;
+  try {
+    const kb = await listKb(tenant.tenantId);
+    const titles = kb
+      .filter((e) => e.enabled && typeof e.title === "string" && e.title.trim())
+      .map((e) => e.title.trim())
+      .slice(0, 3);
+    if (titles.length) suggestedPrompts = titles;
+  } catch {
+    suggestedPrompts = undefined;
+  }
+
   const res: SessionResponse = {
     token,
     sessionId,
     expiresAt: exp,
-    branding: tenant.branding
+    branding: { ...tenant.branding, suggestedPrompts }
   };
   return json(200, SessionResponse.parse(res), corsHeaders(matchedOrigin));
 };
