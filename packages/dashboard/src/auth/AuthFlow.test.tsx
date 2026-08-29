@@ -29,16 +29,29 @@ describe("AuthFlow (4.1, 2.9 — stepped auth + client validation)", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => cleanup());
 
-  it("keeps the login button disabled until the form is valid", async () => {
+  it("keeps the login button disabled while the EMAIL is invalid", async () => {
     renderFlow();
     const button = screen.getByTestId("login") as HTMLButtonElement;
     expect(button.disabled).toBe(true);
 
     await userEvent.type(screen.getByTestId("login-email"), "not-an-email");
-    await userEvent.type(screen.getByTestId("login-pass"), "weak");
-    // Still invalid (bad email + weak password) → stays disabled, no POST.
+    await userEvent.type(screen.getByTestId("login-pass"), "whatever");
+    // Bad email → still disabled, no POST.
     expect(button.disabled).toBe(true);
     expect(login).not.toHaveBeenCalled();
+  });
+
+  it("ENABLES login with a valid email and any non-empty password (server verifies)", async () => {
+    // Login must NOT re-enforce signup password complexity — a wrong/simple
+    // password should reach Cognito and surface "Incorrect email or password",
+    // not be blocked client-side with a policy hint.
+    renderFlow();
+    await userEvent.type(screen.getByTestId("login-email"), "a@b.com");
+    await userEvent.type(screen.getByTestId("login-pass"), "weak"); // no upper/digit
+    const button = screen.getByTestId("login") as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    await userEvent.click(button);
+    expect(login).toHaveBeenCalledWith("a@b.com", "weak");
   });
 
   it("enables and submits with valid credentials", async () => {

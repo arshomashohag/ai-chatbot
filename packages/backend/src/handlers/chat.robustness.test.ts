@@ -60,6 +60,8 @@ function invoke(over: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.JWT_KMS_KEY_ID = "key-1";
+  // Request Origin is the chat surface for this test so the origin gate passes.
+  process.env.CHAT_ORIGIN = "shop.example.com";
   verifyMock.mockResolvedValue({
     tenant_id: "t1",
     session_id: "s1",

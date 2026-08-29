@@ -163,3 +163,11 @@ Complete audit trail of user inputs and AI responses. Newest entries appended at
 **Context**: AI-DLC CONSTRUCTION phase complete
 
 ---
+
+## Ultrareview Fixes (whole-branch cloud review)
+**Timestamp**: 2026-08-29T07:10:00Z
+**User Input**: "/ultrareview" (ran cloud review of fix/review-findings → main)
+**AI Response**: Cloud review found 3 cross-unit issues (per-unit reviews each saw one diff in isolation). Verified all 3 in code, all real, all fixed: (bug_001, showstopper) U2 chat origin-binding compared request Origin to claims.origin (merchant), but the chat POST comes from the chat iframe → Origin is always the chat CDN → 401'd every prod message; fixed to require the request Origin == chat surface (CHAT_ORIGIN added to chat Lambda env), real allowlisting stays at session mint; rewrote chat.origin.test to prove the actual prod topology + fixed quota/robustness tests' CHAT_ORIGIN. (bug_002) U5 widget "Try again" only re-posted the cached failed session → infinite unavailable loop; loader platform:ready now re-handshakes on a failed session. (bug_003, nit) portal login reused signup password-complexity schema; split into loginCredentials vs signupCredentials + flipped the test that codified the bug. Result: 129 tests green, both E2E green, typecheck+lint+synth+widget-size clean.
+**Context**: Post-remediation — ultrareview findings triaged + fixed
+
+---

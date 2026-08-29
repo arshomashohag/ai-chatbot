@@ -16,7 +16,8 @@ import { signUp, confirm, login, resendCode, mapAuthError } from "../auth.js";
 
 type Mode = "login" | "signup" | "verify";
 
-const credentials = z.object({
+// Signup enforces the password policy client-side (before hitting Cognito).
+const signupCredentials = z.object({
   email: z.string().email("Enter a valid email address"),
   password: z
     .string()
@@ -25,7 +26,14 @@ const credentials = z.object({
     .regex(/[a-z]/, "Include a lowercase letter")
     .regex(/[0-9]/, "Include a number")
 });
-type Credentials = z.infer<typeof credentials>;
+// Login only checks the field is filled — the server is authoritative for
+// whether the password is correct (a wrong password should surface Cognito's
+// "Incorrect email or password", not a client-side policy hint).
+const loginCredentials = z.object({
+  email: z.string().email("Enter a valid email address"),
+  password: z.string().min(1, "Enter your password")
+});
+type Credentials = z.infer<typeof signupCredentials>;
 
 const verifySchema = z.object({
   code: z.string().min(1, "Enter the code from your email")
@@ -73,6 +81,7 @@ export function AuthFlow({ onAuthenticated }: { onAuthenticated: () => void }) {
           <CredentialsForm
             submitLabel="Log in"
             testid="login"
+            schema={loginCredentials}
             onSubmit={async (v) => {
               try {
                 await login(v.email, v.password);
@@ -87,6 +96,7 @@ export function AuthFlow({ onAuthenticated }: { onAuthenticated: () => void }) {
           <CredentialsForm
             submitLabel="Create account"
             testid="signup"
+            schema={signupCredentials}
             onSubmit={async (v) => {
               try {
                 await signUp(v.email, v.password);
@@ -145,14 +155,16 @@ export function AuthFlow({ onAuthenticated }: { onAuthenticated: () => void }) {
 function CredentialsForm({
   submitLabel,
   testid,
+  schema,
   onSubmit
 }: {
   submitLabel: string;
   testid: string;
+  schema: typeof loginCredentials | typeof signupCredentials;
   onSubmit: (v: Credentials) => Promise<void>;
 }) {
   const { register, handleSubmit, formState } = useForm<Credentials>({
-    resolver: zodResolver(credentials),
+    resolver: zodResolver(schema),
     mode: "onChange"
   });
   return (

@@ -106,7 +106,13 @@ Docs: `aidlc-docs/`. Scope: Tiers 0–2 + all UI (see `aidlc-docs/inception/reve
 - Extensions: SECURITY-08 (authz/IDOR — guard + negative cross-tenant assertions across every handler path) ✅ · PBT-02/03/07/08 (DER→JOSE round-trip [U2], tenant-id + rate-limiter invariants, domain generators, seed/shrink) ✅.
 
 ## RF remediation summary (U1–U9, all committed on `fix/review-findings`)
-All in-scope findings (Tiers 0–2 + all UI) from the two review loops are remediated, each gated (design → code → tests → reviewer-subagent pass → conventional commit). Deferred (documented in `aidlc-docs/inception/reverse-engineering/review-findings.md`): most Tier-3 scale/ops items, full billing/Stripe, GDPR deletion (2.11). Final state: **128 unit tests + both Playwright E2E green; typecheck, lint, cdk synth clean**.
+All in-scope findings (Tiers 0–2 + all UI) from the two review loops are remediated, each gated (design → code → tests → reviewer-subagent pass → conventional commit). Deferred (documented in `aidlc-docs/inception/reverse-engineering/review-findings.md`): most Tier-3 scale/ops items, full billing/Stripe, GDPR deletion (2.11). Final state: **129 unit tests + both Playwright E2E green; typecheck, lint, cdk synth clean**.
+
+### Post-remediation: whole-branch ultrareview fixes
+A cloud ultrareview of the full branch caught 3 cross-unit issues the per-unit reviews couldn't (each saw one unit's diff in isolation) — all fixed:
+- **Showstopper (bug_001)**: U2's chat origin-binding compared the request Origin to `claims.origin` (the merchant origin), but the chat POST is issued from inside the chat iframe → its Origin is always the **chat CDN**, so the check **401'd every real message in prod**. The per-unit test had fabricated matching origins on both sides. Fixed: the handler now requires the request Origin to be the **chat surface** (`CHAT_ORIGIN`, added to the chat Lambda env) — the real origin allowlisting stays at session-mint. The corrected test proves the actual prod topology (chat-CDN request + merchant token → passes).
+- **bug_002**: U5's widget "Try again" only re-posted the cached failed session (loader `platform:ready` → `postToFrame`), so a failed first handshake looped forever. Fixed: `platform:ready` re-runs `handshake()` when the current session failed.
+- **bug_003 (nit)**: the portal login form reused the signup password-complexity schema, so a typo showed "Include a number" instead of letting Cognito return "Incorrect email or password". Fixed: split into `loginCredentials` (email + non-empty password) vs `signupCredentials`.
 
 ## Open WARNs / TODOs
 - [ops] `dynamodb:LeadingKeys: TENANT#*` bounds session+chat Lambdas to tenant partitions but is NOT per-tenant isolation — enforced in app code (JWT/site-key derive tenantId server-side; message PK embeds tenantId). Per-tenant IAM needs request-scoped creds; revisit later. (reviewer P1 #4, P2 #3)

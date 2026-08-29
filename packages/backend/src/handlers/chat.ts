@@ -85,11 +85,19 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     throw e;
   }
 
-  // Bind the bearer token to the origin it was minted for. A token captured
-  // from an allowed page and replayed from another origin (or a no-Origin
-  // server-side client) is rejected — the widget is browser-only and always
-  // sends Origin on its cross-origin POST.
-  if (!reflectOrigin || reflectOrigin !== claims.origin) {
+  // Origin binding note: the chat POST is issued from inside the chat iframe,
+  // whose document origin is the chat CDN — NOT the merchant page. So the
+  // request Origin is always the chat surface and can't be compared to
+  // `claims.origin` (the merchant origin the token was minted for). The real
+  // origin binding that matters — "this token was issued to a request from an
+  // allowed tenant origin" — is enforced at session-mint time
+  // (`matchAllowedOrigin` in session.ts), and the token is KMS-signed,
+  // exp-capped (≤60m), and tenant/session-scoped. Here we require the request
+  // to at least come from a browser on our own chat surface (rejects a
+  // no-Origin server-side replay), without the (impossible) merchant-origin
+  // equality that broke every real request.
+  const chatOrigin = normalizeOrigin(`https://${process.env.CHAT_ORIGIN ?? ""}`);
+  if (!reflectOrigin || (chatOrigin && reflectOrigin !== chatOrigin)) {
     return error(401, "unauthorized", "Invalid or expired session", cors);
   }
 

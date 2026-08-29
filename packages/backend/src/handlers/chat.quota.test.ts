@@ -62,6 +62,9 @@ function invoke() {
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.JWT_KMS_KEY_ID = "key-1";
+  // Request Origin (shop.example.com) is the chat surface for this test so the
+  // origin gate passes — these tests exercise quota, not origin binding.
+  process.env.CHAT_ORIGIN = "shop.example.com";
   verifyMock.mockResolvedValue({
     tenant_id: "t1",
     session_id: "s1",

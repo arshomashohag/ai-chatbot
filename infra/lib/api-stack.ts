@@ -147,7 +147,10 @@ export class ApiStack extends Stack {
         ENV: config.env,
         TABLE_NAME: table.tableName,
         JWT_KMS_KEY_ID: jwtKey.keyId,
-        MODEL_API_KEY_SECRET_ARN: modelKeySecret.secretArn
+        MODEL_API_KEY_SECRET_ARN: modelKeySecret.secretArn,
+        // The chat POST comes from inside the chat iframe (this surface); the
+        // handler requires the request Origin to be this chat origin.
+        CHAT_ORIGIN: config.subdomains.chat
       }
     });
 

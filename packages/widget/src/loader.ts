@@ -132,7 +132,19 @@ function boot(): void {
   window.addEventListener("message", (ev) => {
     if (ev.origin !== settings.chatOrigin) return;
     if (ev.source !== frame?.contentWindow) return;
-    if (ev.data?.type === "platform:ready") postToFrame();
+    if (ev.data?.type === "platform:ready") {
+      // A `platform:ready` after a FAILED session is a retry ("Try again"):
+      // re-run the handshake before re-posting, otherwise we'd just re-send the
+      // cached failed session and the user is stuck in the unavailable state.
+      if (!session || session.ok === false) {
+        void handshake(settings).then((s) => {
+          session = s;
+          postToFrame();
+        });
+      } else {
+        postToFrame();
+      }
+    }
     // The chat requested close (header X or Esc) — hide the frame and return
     // focus to the launcher. Critical on mobile where the frame is fullscreen.
     if (ev.data?.type === "platform:close") setOpen(false);
