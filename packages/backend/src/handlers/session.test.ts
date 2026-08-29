@@ -117,3 +117,54 @@ describe("session handler", () => {
     expect(parsed.branding.suggestedPrompts).toBeUndefined();
   });
 });
+
+describe("session CORS (2.6 — widget is cross-origin from the embedding site)", () => {
+  beforeEach(() => {
+    ddb.reset();
+    kms.reset();
+    process.env.TABLE_NAME = "platform-test";
+    process.env.JWT_KMS_KEY_ID = "key-abc";
+    ddb.on(QueryCommand).callsFake((input) => {
+      if (input.IndexName === "GSI1") return { Items: [TENANT_ITEM] };
+      return { Items: [] };
+    });
+    ddb.on(PutCommand).resolves({});
+    kms.on(SignCommand).resolves({ Signature: fakeDerSig() });
+  });
+
+  const ORIGIN = "https://shop.example.com";
+
+  it("answers the OPTIONS preflight with 204 + CORS (this is what unblocks the widget)", async () => {
+    const res = (await handler(
+      {
+        headers: { origin: ORIGIN },
+        requestContext: { http: { method: "OPTIONS" } }
+      } as never,
+      ctx,
+      cb
+    )) as { statusCode: number; headers?: Record<string, string> };
+    expect(res.statusCode).toBe(204);
+    expect(res.headers?.["access-control-allow-origin"]).toBe(ORIGIN);
+  });
+
+  it("attaches CORS on a 403 (origin not allowed) so the browser can read it, not just see a CORS error", async () => {
+    const res = (await handler(
+      { headers: { origin: "https://not-allowed.com" }, body: JSON.stringify({ siteKey: SITE_KEY }) } as never,
+      ctx,
+      cb
+    )) as { statusCode: number; headers?: Record<string, string>; body: string };
+    expect(res.statusCode).toBe(403);
+    expect(res.headers?.["access-control-allow-origin"]).toBe("https://not-allowed.com");
+    expect(JSON.parse(res.body).error.code).toBe("origin_not_allowed");
+  });
+
+  it("attaches CORS on the 200 success path", async () => {
+    const res = (await handler(
+      { headers: { origin: ORIGIN, "user-agent": "t" }, body: JSON.stringify({ siteKey: SITE_KEY }) } as never,
+      ctx,
+      cb
+    )) as { statusCode: number; headers?: Record<string, string> };
+    expect(res.statusCode).toBe(200);
+    expect(res.headers?.["access-control-allow-origin"]).toBe(ORIGIN);
+  });
+});
