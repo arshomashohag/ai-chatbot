@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 // Shared design system: CSS variables consumed by the MUI theme + any raw
 // elements, so the portal draws from the same tokens as marketing (no drift).
@@ -13,7 +14,9 @@ createRoot(document.getElementById("app")!).render(
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <SnackbarProvider>
-        <App />
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
       </SnackbarProvider>
     </ThemeProvider>
   </StrictMode>

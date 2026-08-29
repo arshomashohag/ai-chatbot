@@ -41,6 +41,30 @@ describe("admin handler", () => {
     expect((res as { statusCode: number }).statusCode).toBe(403);
   });
 
+  it("returns a usage summary (messages, limit, sessions) for the Overview", async () => {
+    // General default (USAGE# absent → messages 0); specific matchers below win.
+    ddb.on(GetCommand).resolves({ Item: undefined });
+    ddb.on(GetCommand, { Key: { PK: userPk("s"), SK: profileSk() } }).resolves({
+      Item: { tenantId: "t1" }
+    });
+    // The CONFIG carries the tenant's monthly limit.
+    ddb.on(GetCommand, { Key: { PK: tenantPk("t1"), SK: "CONFIG" } }).resolves({
+      Item: { monthlyMessageLimit: 5000 }
+    });
+    ddb.on(QueryCommand).resolves({ Count: 7 });
+    const res = (await handler(
+      { rawPath: "/v1/admin/usage", requestContext: { http: { method: "GET" }, authorizer: { jwt: { claims: { sub: "s" } } } } } as never,
+      ctx,
+      cb
+    )) as { statusCode: number; body: string };
+    expect(res.statusCode).toBe(200);
+    const u = JSON.parse(res.body);
+    expect(u.limit).toBe(5000);
+    expect(u.messages).toBe(0);
+    expect(u.sessions).toBe(7);
+    expect(typeof u.month).toBe("string");
+  });
+
   it("lazily provisions a tenant when the caller has a valid sub but no tenant record (self-heals a failed post-confirmation)", async () => {
     // No USER# profile exists yet (post-confirmation never ran / failed).
     ddb.on(GetCommand).resolves({ Item: undefined });
