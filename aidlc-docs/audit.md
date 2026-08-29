@@ -139,3 +139,11 @@ Complete audit trail of user inputs and AI responses. Newest entries appended at
 **Context**: CONSTRUCTION — U7 Code Generation + gate (about to commit)
 
 ---
+
+## CONSTRUCTION U8 — Deploy pipeline safety
+**Timestamp**: 2026-08-29T06:00:00Z
+**User Input**: "continue to U8"
+**AI Response**: U7 committed (c7fce94). U8 Infrastructure Design written. Implemented 2.2 (cache-safe add-then-prune sync + immutable/no-cache Cache-Control per file type), 2.3 (OIDC dev/staging trust → environment:<env>; snippet crossorigin; SRI deferred+documented), 2.5 (smoke test on /health with retry; rollback runbook in README; prod-follows-staging convention), 3.21 (debug-OIDC step gated behind debug input, default false). Tests: 108 green (unaffected). deploy.yml + CFN valid YAML; typecheck+lint clean. Reviewer subagent: 7-point adversarial pass, no findings ≥80; confirmed OIDC scoping tighter+correct, no missing-asset window, prune preserves headers, smoke gate can't false-pass, no fake SRI. Applied sub-threshold hardening: smoke test retries on any non-200 (not just 5xx) for post-deploy propagation lag. PROGRESS.md U8 gate written. Committing.
+**Context**: CONSTRUCTION — U8 Code Generation + gate (about to commit)
+
+---

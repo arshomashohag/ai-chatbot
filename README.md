@@ -118,8 +118,18 @@ Actions → Run     → deploy-prod.yml    (behind the `prod` GitHub environment
 
 Trigger a deploy from the **Actions** tab → pick the workflow → **Run
 workflow**. Each deploy assumes the env's OIDC role and passes `DOMAIN_NAME` to
-CDK. Prod is additionally gated by a required-reviewer rule on the `prod`
-GitHub environment.
+CDK. **Every** environment's OIDC role trusts `environment:<env>` (not just a
+branch), so a run must enter the matching **GitHub Environment** — set up
+required-reviewer rules there to gate deploys (prod especially). Convention:
+**deploy to `staging` and confirm green before deploying `prod`.**
+
+After the asset sync, the pipeline runs a **post-deploy smoke test** against
+`/health`; a non-200 fails the run so a bad deploy is caught immediately.
+
+**Rollback** (version-redeploy): re-run the deploy workflow from the last known
+good commit SHA (Actions → Run workflow → pick the ref). CDK re-converges the
+infrastructure and the asset sync re-publishes that build. There is no separate
+rollback tooling — the deploy *is* the rollback mechanism.
 
 ### Static assets & frontend config
 

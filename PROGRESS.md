@@ -11,7 +11,7 @@ Multi-tenant AI chatbot platform. Phases per `docs/chatbot-platform-implementati
 | P2 | Chat pipeline + model + one tool | ✅ complete |
 | P3 | Abuse protection | ✅ complete |
 | P4 | Marketing site + tenant portal v1 | ✅ complete |
-| RF | Review-findings remediation (AI-DLC, `fix/review-findings`) | 🚧 in progress (U7/9) |
+| RF | Review-findings remediation (AI-DLC, `fix/review-findings`) | 🚧 in progress (U8/9) |
 
 ## Gate checklist (each phase)
 tests green → reviewer subagent pass → conventional commit → PROGRESS update.
@@ -88,6 +88,15 @@ Docs: `aidlc-docs/`. Scope: Tiers 0–2 + all UI (see `aidlc-docs/inception/reve
 - Tests: **108 green** (+4 CSP template assertions: 4 policies, no `script-src 'unsafe-inline'`, only chat framable, portal→Cognito). Both E2E green; typecheck + lint + synth clean.
 - Reviewer: adversarial pass — confirmed CSP correctness (frame-ancestors * safe: token is unicast via targeted postMessage, not broadcast), script-src strict, env-independent, style-src tradeoff sound; caught **1 Critical** (CSS specificity collision reverting the AA fix in the built artifact) which I fixed (`.wrap`-scoped overrides, re-verified in dist).
 - Extensions: SECURITY-04 (CSP + headers per surface, script-src strict, framing correct) ✅ · a11y (AA contrast) ✅ · PBT N/A.
+
+### U8 gate — Deploy pipeline safety ✅
+- **2.2** Cache-safe asset publish: `publish()` uploads content-hashed `/assets/*` as `immutable` (add-only, no `--delete`) then the mutable entrypoint (`widget.js`/`chat.html`/`index.html`) as `no-cache`; then invalidate; then `prune()` (`--delete`) runs **after** invalidation — so a client mid-session never requests an asset deleted before its replacement is up. Replaces the old single `sync --delete` pass.
+- **2.3** OIDC dev/staging trust changed from `ref:refs/heads/main` → `environment:<env>` (uniform with prod) — a run must enter the matching GitHub Environment (cryptographically enforced, honors required-reviewer rules). Snippet gains `crossorigin="anonymous"`; real SRI deferred (needs versioned widget filename — honestly documented, no fake integrity attr).
+- **2.5** Post-deploy **smoke test** polls `/health` until 200 (retries on any non-200 for propagation lag); non-200 fails the run. **Rollback runbook** (version-redeploy from last good SHA) added to README; prod-follows-staging convention documented.
+- **3.21** The debug-OIDC step now runs only when the caller passes `debug: true` (new `workflow_call` boolean input, default false) — off the prod critical path.
+- Verify: **108 tests green** (unaffected); `deploy.yml` + CFN template valid YAML; typecheck + lint clean.
+- Reviewer: adversarial pass on all 7 points — **no findings ≥80**; confirmed OIDC scoping correct + tighter, sync ordering has no missing-asset window, prune preserves headers (mtime skip), smoke gate can't false-pass, debug gating correct, no fake SRI. Applied its sub-threshold note (smoke test now retries on 4xx, not just 5xx).
+- Extensions: SECURITY-13 (CI/CD integrity — env-scoped OIDC; SRI partial+documented) ✅ · RESILIENCY-04 (version-redeploy rollback) ✅ · RESILIENCY-06 (post-deploy health check) ✅ · RESILIENCY-15 (smoke gate + rollback runbook) ✅.
 
 ## Open WARNs / TODOs
 - [ops] `dynamodb:LeadingKeys: TENANT#*` bounds session+chat Lambdas to tenant partitions but is NOT per-tenant isolation — enforced in app code (JWT/site-key derive tenantId server-side; message PK embeds tenantId). Per-tenant IAM needs request-scoped creds; revisit later. (reviewer P1 #4, P2 #3)

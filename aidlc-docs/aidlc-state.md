@@ -72,8 +72,8 @@
 - [x] U5 Widget UX — FD + code (0.3, 4.11–4.17) + 101 unit tests green (+13) + handshake E2E green + widget 1.71KB gz + typecheck/lint clean + reviewer pass (no findings) + committed. money-path E2E pre-existing baseline failure (dashboard mock), addressed in U6.
 - [x] U6 Portal React+MUI — FD + full rewrite + 104 tests (+3 RTL) + BOTH E2E green + XSS gate + typecheck/lint clean + reviewer pass (fixed 1 Critical snackbar-memo + 1 Important CI grep gate) + committed
 - [x] U7 Marketing + CSP + design-system — FD + code + 108 tests green (+4 CSP) + both E2E green + typecheck/lint/synth clean + reviewer pass (fixed 1 Critical CSS-cascade collision reverting AA fix) + committed. Wired ?mode=signup into portal AuthFlow.
-- [ ] U8 Deploy pipeline safety  ← next
-- [ ] U9 Tests + tenant-access guard
+- [x] U8 Deploy pipeline safety — FD + code + 108 tests green + valid YAML + typecheck/lint clean + reviewer pass (no findings; applied smoke-retry hardening) + committed
+- [ ] U9 Tests + tenant-access guard  ← next (final unit)
 
 ## Findings Inventory (source of work)
 See `aidlc-docs/inception/reverse-engineering/review-findings.md` — the consolidated, deduplicated findings from both review loops. This is the master issue list this workflow will remediate.
