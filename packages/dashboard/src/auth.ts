@@ -32,6 +32,13 @@ export function confirm(email: string, code: string): Promise<void> {
   });
 }
 
+export function resendCode(email: string): Promise<void> {
+  const user = new CognitoUser({ Username: email, Pool: pool });
+  return new Promise((resolve, reject) => {
+    user.resendConfirmationCode((err) => (err ? reject(err) : resolve()));
+  });
+}
+
 export function login(
   email: string,
   password: string
@@ -49,10 +56,15 @@ export function login(
   });
 }
 
+// The E2E harness exercises the portal + admin API without a live Cognito pool.
+// Fail-closed: the bypass is only ever taken in a non-production bundle AND when
+// VITE_E2E is set. A production build additionally cannot be built with VITE_E2E
+// set (see vite.config.ts), so this branch is dead-code-eliminated in prod.
+const E2E_BYPASS =
+  import.meta.env.MODE !== "production" && Boolean(import.meta.env.VITE_E2E);
+
 export function currentToken(): Promise<string | null> {
-  // E2E harness bypass: exercise the portal + admin API without a live Cognito
-  // pool. Never enabled in production builds (VITE_E2E is unset there).
-  if (import.meta.env.VITE_E2E) {
+  if (E2E_BYPASS) {
     return Promise.resolve(localStorage.getItem("e2e_token"));
   }
   const user = pool.getCurrentUser();
@@ -65,6 +77,38 @@ export function currentToken(): Promise<string | null> {
   });
 }
 
+export function currentEmail(): string | null {
+  if (E2E_BYPASS) return "e2e@example.com";
+  return pool.getCurrentUser()?.getUsername() ?? null;
+}
+
 export function logout(): void {
   pool.getCurrentUser()?.signOut();
+}
+
+// Map common Cognito errors to plain, human copy (never show raw SDK strings).
+export function mapAuthError(err: unknown): string {
+  const name = (err as { name?: string })?.name ?? "";
+  const message = (err as { message?: string })?.message ?? "Something went wrong.";
+  switch (name) {
+    case "UsernameExistsException":
+      return "An account with this email already exists. Try logging in.";
+    case "NotAuthorizedException":
+      return "Incorrect email or password.";
+    case "UserNotConfirmedException":
+      return "Please verify your email first — check your inbox for a code.";
+    case "CodeMismatchException":
+      return "That verification code isn't right. Please try again.";
+    case "ExpiredCodeException":
+      return "That code has expired. Request a new one.";
+    case "UserNotFoundException":
+      return "No account found for this email.";
+    case "InvalidPasswordException":
+    case "InvalidParameterException":
+      return "Password must be at least 8 characters with upper, lower, and a number.";
+    case "LimitExceededException":
+      return "Too many attempts. Please wait a moment and try again.";
+    default:
+      return message;
+  }
 }

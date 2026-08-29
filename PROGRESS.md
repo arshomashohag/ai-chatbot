@@ -11,7 +11,7 @@ Multi-tenant AI chatbot platform. Phases per `docs/chatbot-platform-implementati
 | P2 | Chat pipeline + model + one tool | ✅ complete |
 | P3 | Abuse protection | ✅ complete |
 | P4 | Marketing site + tenant portal v1 | ✅ complete |
-| RF | Review-findings remediation (AI-DLC, `fix/review-findings`) | 🚧 in progress (U1/9) |
+| RF | Review-findings remediation (AI-DLC, `fix/review-findings`) | 🚧 in progress (U6/9) |
 
 ## Gate checklist (each phase)
 tests green → reviewer subagent pass → conventional commit → PROGRESS update.
@@ -67,6 +67,18 @@ Docs: `aidlc-docs/`. Scope: Tiers 0–2 + all UI (see `aidlc-docs/inception/reve
 - Reviewer: adversarial pass on 7 points — no findings ≥80; confirmed XSS-safe link rendering, sound loopback exemption, validated postMessage, best-effort KB, correct contrast math, preserved E2E selectors. Applied the sub-threshold punctuation-trim polish.
 - Extensions: SECURITY (XSS-safe rendering) ✅ · SECURITY-08 (platform:close validated) ✅ · a11y (aria-live, aria-expanded, Esc, focus return) ✅ · PBT N/A (small-domain pure helpers example-tested).
 - NOTE: money-path E2E (dashboard flow) fails on the baseline too — pre-existing mock-dashboard issue, unrelated to U5; U6 (portal rewrite) addresses.
+
+### U6 gate — Portal → React + MUI ✅
+- Full framework migration of `packages/dashboard`: vanilla `innerHTML`-string DOM → **React 19 + MUI 6 + react-hook-form + zod** (reusing shared schemas). Widget/marketing untouched.
+- **1.3** Stored XSS eliminated structurally (React escaping; zero `dangerouslySetInnerHTML`/`innerHTML`) + a **CI grep gate** so it can't regress.
+- **2.9** Every form validates client-side (zodResolver on the shared schemas); submit disabled until valid; inline field errors — no more raw Cognito strings.
+- **2.8 / 4.3 / 4.4** Global Snackbar shows success AND error on every mutation (no silent saves). **4.6** embed snippet + site key have Copy buttons. **4.7** color picker defaults to `#6d5ae6`. **4.8** tone Select reflects saved value. **4.9** multi-domain allowlist. **4.5/4.10** signed-in identity shown; auth inputs get autoComplete/inputMode.
+- **4.1** Auth is a stepped flow (login ⇄ create-account → verify, email carried, resend); **4.2/4.4** empty states for FAQs + conversations.
+- **4.21–4.23** MUI theme mapped from brand tokens (accent `#6d5ae6`, Plus Jakarta Sans); one brand name; consistent transcript bubbles.
+- **E2E bypass hardened**: `MODE !== "production" && VITE_E2E`; prod build throws if `VITE_E2E` set; CI E2E uses `build:e2e` (`--mode e2e`). Fail-closed — prod can't carry the bypass.
+- Tests: **104 green** (+3 RTL: validation blocks submit, stepped auth). **Both E2E green** — money-path now passes (was baseline-broken because `dist` wasn't built). typecheck + lint clean. XSS gate clean.
+- Reviewer: found + I fixed a **Critical** (unmemoized snackbar context re-fired Dashboard's load effect → spinner flash + section remount on every save) and an **Important** (the claimed XSS grep gate didn't exist — now added to CI). Re-verified.
+- Extensions: SECURITY-05 (all forms validated) ✅ · SECURITY-08/12 (auth; localStorage tradeoff documented, H1 out of scope, XSS that made it exploitable removed) ✅ · a11y (MUI + autoComplete/inputMode/aria-live snackbar) ✅ · PBT N/A (UI + thin mapping).
 
 ## Open WARNs / TODOs
 - [ops] `dynamodb:LeadingKeys: TENANT#*` bounds session+chat Lambdas to tenant partitions but is NOT per-tenant isolation — enforced in app code (JWT/site-key derive tenantId server-side; message PK embeds tenantId). Per-tenant IAM needs request-scoped creds; revisit later. (reviewer P1 #4, P2 #3)

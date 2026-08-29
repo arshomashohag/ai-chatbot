@@ -123,3 +123,11 @@ Complete audit trail of user inputs and AI responses. Newest entries appended at
 **Context**: CONSTRUCTION — U5 Code Generation + gate (about to commit)
 
 ---
+
+## CONSTRUCTION U6 — Portal React + MUI rewrite
+**Timestamp**: 2026-08-29T04:30:00Z
+**User Input**: "continue to U6"
+**AI Response**: U5 committed (09eed19). U6 FD written. Full migration of packages/dashboard to React 19 + MUI 6 + react-hook-form + zod (theme from brand tokens; AuthFlow stepper; Basics/Appearance/Knowledge/Key/Sessions sections; useSnackbar). Fixes 1.3 (XSS via React escaping + CI grep gate), 2.8/2.9 (validation + snackbar feedback + copy button + color picker + tone + multi-domain + empty states + identity), 4.1-4.10, 4.21-4.23. Hardened E2E bypass (mode-gated + build:e2e + prod-build guard). Deps added (react/mui/rhf/zod/happy-dom); pinned MUI to v6 (v9 API churn); vitest include += .tsx. Fixed the pre-existing money-path E2E baseline failure (dist now builds). Tests: 104 green (+3 RTL). Both E2E green. Reviewer subagent: found 1 Critical (unmemoized snackbar context → Dashboard load effect re-fires on every save, remounting sections) + 1 Important (claimed XSS grep gate absent) — both fixed (useMemo + ref-based mount-only effect; CI grep step) and re-verified. PROGRESS.md U6 gate written. Committing.
+**Context**: CONSTRUCTION — U6 Code Generation + gate (about to commit)
+
+---
