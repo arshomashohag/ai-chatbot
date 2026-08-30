@@ -16,6 +16,7 @@ import {
   sessionSk,
   messageSk,
   usageSk,
+  siteContentSk,
   assertTenantId,
   assertSessionId
 } from "@platform/shared";
@@ -329,6 +330,66 @@ export async function getUsage(
     })
   );
   return (res.Item?.messages as number | undefined) ?? 0;
+}
+
+export interface StoredSiteContent {
+  contentHash: string;
+  url: string;
+  title?: string;
+}
+
+/**
+ * Read the last-known snapshot of a page (by URL hash) for a tenant. Returns
+ * null the first time we ever see a page — the caller treats that as "new".
+ */
+export async function getSiteContent(
+  tenantId: string,
+  urlHash: string
+): Promise<StoredSiteContent | null> {
+  assertTenantId(tenantId);
+  const res = await client.send(
+    new GetCommand({
+      TableName: tableName(),
+      Key: { PK: tenantPk(tenantId), SK: siteContentSk(urlHash) }
+    })
+  );
+  const item = res.Item;
+  if (!item) return null;
+  return {
+    contentHash: item.contentHash as string,
+    url: item.url as string,
+    title: item.title as string | undefined
+  };
+}
+
+/**
+ * Upsert a page snapshot for a tenant. We store the content hash (for change
+ * detection) plus url/title for the portal; the full text is intentionally NOT
+ * kept — the model receives it inline on the turn, and re-storing 12KB per page
+ * per tenant buys nothing the hash doesn't.
+ */
+export async function putSiteContent(params: {
+  tenantId: string;
+  urlHash: string;
+  contentHash: string;
+  url: string;
+  title?: string;
+  updatedAt: number;
+}): Promise<void> {
+  assertTenantId(params.tenantId);
+  await client.send(
+    new PutCommand({
+      TableName: tableName(),
+      Item: {
+        PK: tenantPk(params.tenantId),
+        SK: siteContentSk(params.urlHash),
+        contentHash: params.contentHash,
+        url: params.url,
+        title: params.title,
+        updatedAt: params.updatedAt
+      }
+    })
+  );
 }
 
 /**

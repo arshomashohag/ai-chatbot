@@ -7,6 +7,10 @@ const ACCENT_FALLBACK = "#6d5ae6";
 
 let token = "";
 let apiBase = "";
+// Page snapshot supplied by the loader (parent page). Sent to the backend as a
+// property distinct from `message`, and ONLY on the first message of the
+// session — cleared right after so subsequent turns carry just the message.
+let pageContext: unknown = null;
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -117,6 +121,13 @@ async function send(text: string): Promise<void> {
   button.disabled = true;
   appendMessage("user", text);
   const typing = showTyping();
+  // Attach the page snapshot on the FIRST message only, as its own property, and
+  // clear it so it's never sent again this session.
+  const reqBody: { message: string; pageContext?: unknown } = { message: text };
+  if (pageContext) {
+    reqBody.pageContext = pageContext;
+    pageContext = null;
+  }
   try {
     const res = await fetch(`${apiBase}/v1/chat/message`, {
       method: "POST",
@@ -124,7 +135,7 @@ async function send(text: string): Promise<void> {
         "content-type": "application/json",
         authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ message: text })
+      body: JSON.stringify(reqBody)
     });
     typing.remove();
     if (res.status === 429) {
@@ -181,6 +192,11 @@ window.addEventListener("message", (ev) => {
     if (parsed.success && safeApiBase) {
       token = session.token;
       apiBase = safeApiBase;
+      // Stash the loader-captured page snapshot for the first outbound message.
+      pageContext =
+        data.pageContext && typeof data.pageContext === "object"
+          ? data.pageContext
+          : null;
       renderConnected(parsed.data.branding);
       return;
     }

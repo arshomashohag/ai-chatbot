@@ -12,8 +12,12 @@ import {
   incrementUsage,
   getUsage,
   tripKillSwitch,
+  getSiteContent,
+  putSiteContent,
   DEFAULT_MONTHLY_MESSAGE_LIMIT
 } from "../lib/ddb.js";
+import { hashContent, hashUrl } from "@platform/shared/node";
+import type { PageContext } from "@platform/shared";
 import { AnthropicAdapter } from "../lib/adapter/anthropic.js";
 import { modelApiKey } from "../lib/secrets.js";
 import { runChat } from "../lib/chat-engine.js";
@@ -56,6 +60,59 @@ function widgetCors(origin: string | null): Record<string, string> {
     "access-control-allow-headers": "content-type,authorization",
     vary: "Origin"
   };
+}
+
+/**
+ * Decide whether to hand the model this turn's page snapshot, and whether to
+ * flag it as changed. Rules:
+ *   - No `pageContext` on the request (2nd+ message, or an old widget) → skip.
+ *   - No stored snapshot for this URL → NEW: send it, flag not-changed, store.
+ *   - Stored hash matches → the model has effectively seen this page → skip.
+ *   - Stored hash differs → send it, flag changed, update the stored snapshot.
+ * The DDB write is best-effort: a store failure must not cost the user a reply,
+ * so on error we still send the content (the model just may re-see it next time).
+ */
+export async function resolvePageContext(
+  tenantId: string,
+  pageContext: PageContext | undefined
+): Promise<{ send?: PageContext; changed: boolean }> {
+  if (!pageContext) return { changed: false };
+  const text = pageContext.text ?? "";
+  const url = pageContext.url ?? "";
+  // Nothing meaningful to ground on — don't waste tokens or a DDB round-trip.
+  if (!text && !pageContext.title && !pageContext.description) {
+    return { changed: false };
+  }
+  const urlHash = hashUrl(url);
+  const contentHash = hashContent(`${pageContext.title ?? ""}\n${text}`);
+
+  try {
+    const stored = await getSiteContent(tenantId, urlHash);
+    if (stored && stored.contentHash === contentHash) {
+      // Same content the model already saw for this page — skip re-sending.
+      return { changed: false };
+    }
+    const changed = Boolean(stored);
+    await putSiteContent({
+      tenantId,
+      urlHash,
+      contentHash,
+      url,
+      title: pageContext.title,
+      updatedAt: Date.now()
+    });
+    return { send: pageContext, changed };
+  } catch (e) {
+    console.warn(
+      JSON.stringify({
+        event: "sitecontent_check_failed",
+        tenant: tenantId,
+        error: e instanceof Error ? e.message : "unknown"
+      })
+    );
+    // Fail toward grounding: send the page, treat as new (not "changed").
+    return { send: pageContext, changed: false };
+  }
 }
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
@@ -185,6 +242,12 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     entries: kb
   });
 
+  // Page grounding: on the first message of a session the widget sends a page
+  // snapshot in `pageContext` (a field distinct from `message`). We ground the
+  // model with it only when it's new or has changed vs. the last snapshot we
+  // stored for this URL — never re-sending unchanged content.
+  const page = await resolvePageContext(claims.tenant_id, parsed.data.pageContext);
+
   let result;
   try {
     const adapter = new AnthropicAdapter({
@@ -196,7 +259,9 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       tenantId: claims.tenant_id,
       adapter,
       history,
-      userMessage: parsed.data.message
+      userMessage: parsed.data.message,
+      pageContext: page.send,
+      pageChanged: page.changed
     });
   } catch (e) {
     console.error(

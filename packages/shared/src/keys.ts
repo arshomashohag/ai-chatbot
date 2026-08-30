@@ -48,3 +48,10 @@ export function profileSk(): string {
 export function kbSk(id: string): string {
   return `KB#${id}`;
 }
+
+// Per-tenant snapshot of a page the widget was embedded on, keyed by a hash of
+// the page URL so different pages of the same site are tracked independently.
+// Lives under TENANT# so the existing LeadingKeys IAM boundary already covers it.
+export function siteContentSk(urlHash: string): string {
+  return `SITECONTENT#${urlHash}`;
+}
