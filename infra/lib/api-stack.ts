@@ -132,13 +132,21 @@ export class ApiStack extends Stack {
       integration: new HttpLambdaIntegration("SessionIntegration", this.sessionFn)
     });
 
-    // MODEL_API_KEY is supplied at deploy time via secret material — never in
-    // code or CloudFormation template. Import by name; CDK grants read only.
-    const modelKeySecret = Secret.fromSecretNameV2(
-      this,
-      "ModelApiKeySecret",
-      `chatbot-platform-${config.env}/model-api-key`
-    );
+    // Create the model-API-key secret SHELL. On first create, CloudFormation
+    // seeds it with a random placeholder value (Secrets Manager rejects a truly
+    // empty secret) — you overwrite it once with the real key via
+    // `aws secretsmanager put-secret-value`. Crucially, we pass NO explicit
+    // value: the key material is never in code or the CloudFormation template,
+    // and generation only happens at create-time, so redeploys NEVER overwrite
+    // the value you set. RETAIN in prod so a stack teardown can't drop a live
+    // key.
+    const modelKeySecret = new Secret(this, "ModelApiKeySecret", {
+      secretName: `chatbot-platform-${config.env}/model-api-key`,
+      description:
+        "Model provider API key (e.g. Anthropic). Populate manually via put-secret-value.",
+      removalPolicy:
+        config.env === "prod" ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY
+    });
 
     this.chatFn = nodeHandler(this, "ChatFn", {
       handlerFile: "chat.ts",
