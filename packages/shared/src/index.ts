@@ -6,4 +6,5 @@ export * from "./contracts/admin.js";
 export * from "./tools.js";
 export * from "./keys.js";
 export * from "./tenant.js";
+export * from "./markdown.js";
 // Node-only crypto helpers live in "@platform/shared/node".

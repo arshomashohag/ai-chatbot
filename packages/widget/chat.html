@@ -167,6 +167,57 @@
       .msg.bot a {
         color: var(--wa);
       }
+      /* Formatted model output inside a bubble. Tight vertical rhythm so
+         paragraphs, headings and lists read as one message, not a document. */
+      .msg > :first-child {
+        margin-top: 0;
+      }
+      .msg > :last-child {
+        margin-bottom: 0;
+      }
+      .msg p {
+        margin: 0 0 8px;
+      }
+      .msg h1,
+      .msg h2,
+      .msg h3 {
+        font-weight: 700;
+        line-height: 1.3;
+        margin: 12px 0 6px;
+      }
+      .msg h1 {
+        font-size: 16px;
+      }
+      .msg h2 {
+        font-size: 15px;
+      }
+      .msg h3 {
+        font-size: 14px;
+      }
+      .msg ul,
+      .msg ol {
+        margin: 4px 0 8px;
+        padding-left: 20px;
+      }
+      .msg li {
+        margin: 2px 0;
+      }
+      .msg strong {
+        font-weight: 700;
+      }
+      .msg em {
+        font-style: italic;
+      }
+      .msg code {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 0.9em;
+        background: rgba(20, 19, 26, 0.06);
+        padding: 1px 5px;
+        border-radius: 5px;
+      }
+      .msg.user code {
+        background: rgba(255, 255, 255, 0.22);
+      }
       .msg.bot {
         align-self: flex-start;
         background: #fff;

@@ -43,34 +43,14 @@ export function isSafeApiBase(value: unknown): boolean {
   }
 }
 
-export type Segment = { type: "text" | "link"; value: string };
-
-/**
- * Split text into plain and link segments. Only http(s) URLs become links, so
- * javascript:/data:/other schemes are never linkified (rendered as plain text).
- */
-export function splitLinks(text: string): Segment[] {
-  const urlRe = /(https?:\/\/[^\s]+)/g;
-  const out: Segment[] = [];
-  let last = 0;
-  for (const match of text.matchAll(urlRe)) {
-    let url = match[0];
-    const idx = match.index ?? 0;
-    // Don't swallow trailing sentence punctuation into the link.
-    const trailing = /[.,!?;:)\]]+$/.exec(url);
-    let tail = "";
-    if (trailing) {
-      tail = trailing[0];
-      url = url.slice(0, url.length - tail.length);
-    }
-    if (idx > last) out.push({ type: "text", value: text.slice(last, idx) });
-    out.push({ type: "link", value: url });
-    last = idx + url.length;
-    if (tail) {
-      out.push({ type: "text", value: tail });
-      last += tail.length;
-    }
-  }
-  if (last < text.length) out.push({ type: "text", value: text.slice(last) });
-  return out;
-}
+// Safe Markdown parsing + link splitting now live in @platform/shared so the
+// widget and the portal transcript share one tested implementation. Re-exported
+// here so existing widget imports (main.ts, util.test.ts) keep working.
+export {
+  splitLinks,
+  parseInline,
+  parseMarkdown,
+  type Segment,
+  type Inline,
+  type Block
+} from "@platform/shared";

@@ -14,6 +14,7 @@ import type { SessionSummary, StoredMessage } from "@platform/shared";
 import { api } from "../api.js";
 import { useSnackbar } from "../hooks/useSnackbar.js";
 import { Section } from "./Section.js";
+import { Markdown } from "./Markdown.js";
 
 export function SessionsSection({ sessions }: { sessions: SessionSummary[] }) {
   const snackbar = useSnackbar();
@@ -94,7 +95,11 @@ export function SessionsSection({ sessions }: { sessions: SessionSummary[] }) {
                     color: m.role === "user" ? "#fff" : "text.primary"
                   }}
                 >
-                  {m.content}
+                  {m.role === "assistant" ? (
+                    <Markdown text={m.content} />
+                  ) : (
+                    m.content
+                  )}
                 </Box>
               ))}
             </Box>

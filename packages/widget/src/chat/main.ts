@@ -1,5 +1,12 @@
 import { SessionResponse, ChatMessageResponse } from "@platform/shared";
-import { contrastOk, splitLinks, isSafeApiBase } from "./util.js";
+import {
+  contrastOk,
+  splitLinks,
+  isSafeApiBase,
+  parseMarkdown,
+  type Inline,
+  type Block
+} from "./util.js";
 
 const parentOrigin = new URLSearchParams(location.search).get("parentOrigin");
 
@@ -14,21 +21,77 @@ function el<T extends HTMLElement>(id: string): T {
   return node as T;
 }
 
-// Append a message, linkifying URLs safely (text nodes + anchors, never
-// innerHTML of model output, so no XSS).
+// Build a safe anchor for a URL (never innerHTML of model text → no XSS).
+function linkEl(url: string): HTMLAnchorElement {
+  const a = document.createElement("a");
+  a.href = url;
+  a.textContent = url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  return a;
+}
+
+// Render inline segments (bold/italic/code/link/text) into a parent node.
+function appendInlines(parent: Node, inlines: Inline[]): void {
+  for (const seg of inlines) {
+    if (seg.type === "link") {
+      parent.appendChild(linkEl(seg.value));
+    } else if (seg.type === "bold") {
+      const s = document.createElement("strong");
+      s.textContent = seg.value;
+      parent.appendChild(s);
+    } else if (seg.type === "italic") {
+      const em = document.createElement("em");
+      em.textContent = seg.value;
+      parent.appendChild(em);
+    } else if (seg.type === "code") {
+      const c = document.createElement("code");
+      c.textContent = seg.value;
+      parent.appendChild(c);
+    } else {
+      parent.appendChild(document.createTextNode(seg.value));
+    }
+  }
+}
+
+// Render a parsed Markdown block tree into a container, building every node
+// programmatically so model output is never passed through innerHTML.
+function appendBlocks(parent: Node, blocks: Block[]): void {
+  for (const block of blocks) {
+    if (block.type === "heading") {
+      const h = document.createElement(`h${block.level}`);
+      appendInlines(h, block.inlines);
+      parent.appendChild(h);
+    } else if (block.type === "list") {
+      const list = document.createElement(block.ordered ? "ol" : "ul");
+      for (const item of block.items) {
+        const li = document.createElement("li");
+        appendInlines(li, item);
+        list.appendChild(li);
+      }
+      parent.appendChild(list);
+    } else {
+      const p = document.createElement("p");
+      appendInlines(p, block.inlines);
+      parent.appendChild(p);
+    }
+  }
+}
+
+// Append a message. Bot replies are Markdown — parsed and rendered as formatted
+// DOM (bold/italic/code/headings/lists/links), never as innerHTML of the raw
+// text, so `**`/`#`/`` ` `` show as formatting instead of literal characters
+// with no XSS risk. User messages stay plain text + safe link handling.
 function appendMessage(role: "user" | "bot", text: string): void {
   const div = document.createElement("div");
   div.className = `msg ${role}`;
-  for (const seg of splitLinks(text)) {
-    if (seg.type === "text") {
-      div.appendChild(document.createTextNode(seg.value));
-    } else {
-      const a = document.createElement("a");
-      a.href = seg.value;
-      a.textContent = seg.value;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      div.appendChild(a);
+  if (role === "bot") {
+    appendBlocks(div, parseMarkdown(text));
+  } else {
+    for (const seg of splitLinks(text)) {
+      div.appendChild(
+        seg.type === "link" ? linkEl(seg.value) : document.createTextNode(seg.value)
+      );
     }
   }
   const log = el("log");
