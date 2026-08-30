@@ -44,10 +44,18 @@ aws cloudformation deploy \
 aws cloudformation describe-stacks --stack-name chatbot-github-deploy-dev \
   --query "Stacks[0].Outputs[?OutputKey=='DeployRoleArn'].OutputValue" --output text
 
-# 4. Store the model API key (never a GitHub secret).
-aws secretsmanager create-secret --name chatbot-platform-dev/model-api-key \
+# 4. Populate the model API key (never a GitHub secret). The CDK Api stack
+#    CREATES this secret as an empty shell on deploy — you only set its value
+#    here, once. (Use put-secret-value, not create-secret; CDK owns the secret.)
+aws secretsmanager put-secret-value \
+  --secret-id chatbot-platform-dev/model-api-key \
   --secret-string "<your-anthropic-key>"
 ```
+
+> **Order matters**: `cdk deploy` first (creates the empty secret), then run the
+> command above to populate it. Between deploy and populate, the chat endpoint
+> degrades to a friendly "try again" message because the key is empty. Redeploys
+> never overwrite the value you set (the secret has no value in the template).
 
 Repeat with `EnvName=staging` / `prod` (and their accounts). The template
 trusts the existing `token.actions.githubusercontent.com` OIDC provider in each
