@@ -3,8 +3,8 @@ import { Box, Link, Typography } from "@mui/material";
 import { parseMarkdown, type Inline, type Block } from "@platform/shared";
 
 // Render the shared Markdown AST as React. React escapes all text by default,
-// so no dangerouslySetInnerHTML and no XSS — model output is only ever placed
-// as text children or as hrefs on http(s) links (which the parser guarantees).
+// so there is no raw-HTML sink and no XSS — model output is only ever placed as
+// text children or as hrefs on http(s) links (which the parser guarantees).
 function renderInlines(inlines: Inline[]) {
   return inlines.map((seg, i) => {
     switch (seg.type) {
