@@ -10,6 +10,53 @@ interface Branding {
   color: string;
 }
 
+interface PageContext {
+  url: string;
+  title: string;
+  description?: string;
+  text: string;
+}
+
+// Capture a snapshot of the host page for first-message grounding. Runs on the
+// parent document (the iframe has no access to it). Caps mirror the backend
+// contract (title 300 / description 1000 / text 12000) so the request never
+// exceeds what the server will accept. The widget's own host node is excluded
+// so the bubble/frame markup never leaks into the captured text.
+function capturePage(): PageContext {
+  const meta = (sel: string): string =>
+    (
+      document.querySelector<HTMLMetaElement>(sel)?.content ?? ""
+    ).trim();
+  const description =
+    meta('meta[name="description"]') ||
+    meta('meta[property="og:description"]') ||
+    undefined;
+
+  let text = "";
+  const body = document.body;
+  if (body) {
+    const clone = body.cloneNode(true) as HTMLElement;
+    // Drop the widget's own DOM and non-content nodes from the captured text.
+    clone
+      .querySelectorAll(
+        "[data-platform-widget],script,style,noscript,template,svg"
+      )
+      .forEach((n) => n.remove());
+    text = (clone.innerText || clone.textContent || "")
+      .replace(/\s+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]{2,}/g, " ")
+      .trim();
+  }
+
+  return {
+    url: location.href.slice(0, 2048),
+    title: (document.title || "").slice(0, 300),
+    description: description ? description.slice(0, 1000) : undefined,
+    text: text.slice(0, 12000)
+  };
+}
+
 function resolveScript(): HTMLScriptElement | null {
   const current = document.currentScript as HTMLScriptElement | null;
   if (current?.dataset.siteKey) return current;
@@ -115,8 +162,17 @@ function boot(): void {
 
   function postToFrame(): void {
     if (!frame?.contentWindow || !session) return;
+    // Capture the page fresh at post time (title/content may have changed since
+    // load — e.g. SPA route changes). The chat app sends it only on the first
+    // message; the backend re-sends it to the model only when it has changed.
+    const pageContext = capturePage();
     frame.contentWindow.postMessage(
-      { type: "platform:session", session, apiBase: settings!.apiBase },
+      {
+        type: "platform:session",
+        session,
+        apiBase: settings!.apiBase,
+        pageContext
+      },
       settings!.chatOrigin
     );
   }
