@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { contrastOk, splitLinks, isSafeApiBase } from "./util.js";
+import {
+  contrastOk,
+  splitLinks,
+  isSafeApiBase,
+  parseInline,
+  parseMarkdown
+} from "./util.js";
 
 describe("isSafeApiBase (4.7 — no token redirect)", () => {
   it("accepts https", () => {
@@ -84,5 +90,85 @@ describe("splitLinks (4.15 — safe clickable links)", () => {
       { type: "link", value: "https://a.com" },
       { type: "text", value: ")" }
     ]);
+  });
+});
+
+describe("parseInline (markdown emphasis/code/links)", () => {
+  it("parses bold, italic and code", () => {
+    expect(parseInline("a **b** c")).toEqual([
+      { type: "text", value: "a " },
+      { type: "bold", value: "b" },
+      { type: "text", value: " c" }
+    ]);
+    expect(parseInline("*x* and _y_")).toEqual([
+      { type: "italic", value: "x" },
+      { type: "text", value: " and " },
+      { type: "italic", value: "y" }
+    ]);
+    expect(parseInline("run `npm i`")).toEqual([
+      { type: "text", value: "run " },
+      { type: "code", value: "npm i" }
+    ]);
+  });
+
+  it("keeps code content literal (no nested emphasis)", () => {
+    expect(parseInline("`a*b*c`")).toEqual([{ type: "code", value: "a*b*c" }]);
+  });
+
+  it("leaves a stray asterisk as literal text", () => {
+    expect(parseInline("2 * 3 = 6")).toEqual([
+      { type: "text", value: "2 * 3 = 6" }
+    ]);
+  });
+
+  it("still linkifies urls inside inline text", () => {
+    expect(parseInline("see https://a.com now")).toEqual([
+      { type: "text", value: "see " },
+      { type: "link", value: "https://a.com" },
+      { type: "text", value: " now" }
+    ]);
+  });
+});
+
+describe("parseMarkdown (blocks)", () => {
+  it("splits paragraphs on blank lines", () => {
+    const b = parseMarkdown("hello\n\nworld");
+    expect(b.map((x) => x.type)).toEqual(["paragraph", "paragraph"]);
+  });
+
+  it("parses ATX headings with levels", () => {
+    const b = parseMarkdown("# Title\n## Sub");
+    expect(b).toEqual([
+      { type: "heading", level: 1, inlines: [{ type: "text", value: "Title" }] },
+      { type: "heading", level: 2, inlines: [{ type: "text", value: "Sub" }] }
+    ]);
+  });
+
+  it("groups consecutive bullets into one unordered list", () => {
+    const b = parseMarkdown("- one\n- two\n- three");
+    expect(b.length).toBe(1);
+    expect(b[0]).toMatchObject({ type: "list", ordered: false });
+    expect((b[0] as { items: unknown[] }).items.length).toBe(3);
+  });
+
+  it("parses ordered lists and separates them from unordered", () => {
+    const b = parseMarkdown("1. a\n2. b\n\n- c");
+    expect(b.map((x) => x.type)).toEqual(["list", "list"]);
+    expect(b[0]).toMatchObject({ ordered: true });
+    expect(b[1]).toMatchObject({ ordered: false });
+  });
+
+  it("applies inline formatting inside blocks", () => {
+    const b = parseMarkdown("Here is **bold** text");
+    expect(b[0]).toMatchObject({ type: "paragraph" });
+    expect((b[0] as { inlines: unknown[] }).inlines).toContainEqual({
+      type: "bold",
+      value: "bold"
+    });
+  });
+
+  it("returns an empty array for empty input", () => {
+    expect(parseMarkdown("")).toEqual([]);
+    expect(parseMarkdown("   \n\n  ")).toEqual([]);
   });
 });
