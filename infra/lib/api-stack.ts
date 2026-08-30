@@ -158,11 +158,7 @@ export class ApiStack extends Stack {
         MODEL_API_KEY_SECRET_ARN: modelKeySecret.secretArn,
         // The chat POST comes from inside the chat iframe (this surface); the
         // handler requires the request Origin to be this chat origin.
-        CHAT_ORIGIN: config.subdomains.chat,
-        // Only needed for a workspace-scoped (identity-linked) Anthropic key;
-        // set the ANTHROPIC_WORKSPACE_ID deploy env to pass it through. Not a
-        // secret — it's just a workspace identifier. Empty string when unset.
-        ANTHROPIC_WORKSPACE_ID: process.env.ANTHROPIC_WORKSPACE_ID ?? ""
+        CHAT_ORIGIN: config.subdomains.chat
       }
     });
 

@@ -8,10 +8,6 @@ interface AnthropicAdapterOptions {
   model: string;
   systemPrompt: string;
   maxTokens?: number;
-  // Required when the API key is identity-linked (workspace-scoped): Anthropic
-  // rejects the request with "anthropic-workspace-id is required ..." unless the
-  // workspace id is sent as a header. Optional for standard (org-level) keys.
-  workspaceId?: string;
 }
 
 function toAnthropicMessages(
@@ -65,12 +61,7 @@ export class AnthropicAdapter implements ModelAdapter {
   private maxTokens: number;
 
   constructor(opts: AnthropicAdapterOptions) {
-    this.client = new Anthropic({
-      apiKey: opts.apiKey,
-      ...(opts.workspaceId
-        ? { defaultHeaders: { "anthropic-workspace-id": opts.workspaceId } }
-        : {})
-    });
+    this.client = new Anthropic({ apiKey: opts.apiKey });
     this.model = opts.model;
     this.systemPrompt = opts.systemPrompt;
     this.maxTokens = opts.maxTokens ?? 1024;

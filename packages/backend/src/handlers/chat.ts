@@ -190,9 +190,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     const adapter = new AnthropicAdapter({
       apiKey: await modelApiKey(),
       model: config.model,
-      systemPrompt,
-      // Set when using a workspace-scoped Anthropic key; unset for org keys.
-      workspaceId: process.env.ANTHROPIC_WORKSPACE_ID
+      systemPrompt
     });
     result = await runChat({
       tenantId: claims.tenant_id,
