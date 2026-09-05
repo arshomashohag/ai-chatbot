@@ -31,19 +31,24 @@ permissions:
 jobs:
   destroy:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.env }}
+    # `github.event.inputs` — NOT `inputs` — for a workflow_dispatch. The job
+    # must actually enter this environment: the deploy role's OIDC trust policy
+    # matches sub == repo:<org>/<repo>:environment:<env>, so if this resolves
+    # empty the token carries no `environment:` claim and AssumeRoleWithWebIdentity
+    # is denied. deploy.yml can use `inputs` because it is a workflow_call.
+    environment: ${{ github.event.inputs.env }}
     # Never let a destroy race a deploy for the same environment: share the
     # deploy concurrency group so one waits for the other.
     concurrency:
-      group: deploy-${{ inputs.env }}
+      group: deploy-${{ github.event.inputs.env }}
       cancel-in-progress: false
     steps:
       # Guard 1 — runs before checkout and before any credentials exist, so a
       # mistyped confirmation costs nothing.
       - name: Confirm the environment
         env:
-          ENV: ${{ inputs.env }}
-          CONFIRM: ${{ inputs.confirm }}
+          ENV: ${{ github.event.inputs.env }}
+          CONFIRM: ${{ github.event.inputs.confirm }}
         run: |
           if [ "$CONFIRM" != "$ENV" ]; then
             echo "::error::Confirmation mismatch: typed '${CONFIRM}', expected '${ENV}'. Nothing was destroyed."
@@ -74,7 +79,7 @@ jobs:
           DEV: ${{ secrets.AWS_DEPLOY_ROLE_DEV }}
           STAGING: ${{ secrets.AWS_DEPLOY_ROLE_STAGING }}
           PROD: ${{ secrets.AWS_DEPLOY_ROLE_PROD }}
-          ENV: ${{ inputs.env }}
+          ENV: ${{ github.event.inputs.env }}
         run: |
           set -euo pipefail
           case "$ENV" in
@@ -91,6 +96,30 @@ jobs:
           echo "::add-mask::${arn}"
           echo "arn=${arn}" >> "$GITHUB_OUTPUT"
 
+      # Print the exact claims AWS matches against the role trust policy, so an
+      # AssumeRoleWithWebIdentity denial can be diagnosed from the run log
+      # instead of guessed at. Compare `sub` / `aud` here to the StringLike in
+      # infra/bootstrap/github-deploy-role.yaml. No secrets are printed.
+      - name: Debug OIDC token claims
+        run: |
+          set -euo pipefail
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "::error::Could not fetch an OIDC token — is 'id-token: write' granted?"
+            exit 1
+          fi
+          # Decode the JWT payload (2nd segment). jq's @base64d needs padding,
+          # so pad the base64url payload to a multiple of 4 first.
+          payload=$(echo "$TOKEN" | cut -d. -f2 | tr '_-' '/+')
+          case $(( ${#payload} % 4 )) in
+            2) payload="${payload}==" ;;
+            3) payload="${payload}=" ;;
+          esac
+          echo "OIDC claims presented to AWS:"
+          echo "$payload" | base64 -d | jq '{iss, aud, sub, repository, environment, workflow, job_workflow_ref}'
+          echo "The trust policy requires sub == repo:<org>/<repo>:environment:<env>"
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ steps.role.outputs.arn }}
@@ -102,7 +131,7 @@ jobs:
       - name: Record retained bucket names
         id: buckets
         env:
-          ENV: ${{ inputs.env }}
+          ENV: ${{ github.event.inputs.env }}
         run: |
           set -euo pipefail
           stack="ChatbotPlatform-${ENV}-Edge"
@@ -128,7 +157,7 @@ jobs:
       - name: CDK destroy
         env:
           DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
-          ENV: ${{ inputs.env }}
+          ENV: ${{ github.event.inputs.env }}
           AWS_REGION: us-east-1
         run: pnpm --filter @platform/infra run destroy
 
@@ -192,7 +221,7 @@ jobs:
       # RETAIN by design: a teardown must never drop live customer data.
       - name: Report retained resources
         env:
-          ENV: ${{ inputs.env }}
+          ENV: ${{ github.event.inputs.env }}
         run: |
           {
             echo "### Teardown of \`${ENV}\` complete"
