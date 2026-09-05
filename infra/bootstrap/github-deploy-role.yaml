@@ -4,7 +4,9 @@ Description: >
   Trusts the GitHub OIDC provider that must already exist in this account
   (this template does not create one). The role assumes the CDK bootstrap
   roles (created by `cdk bootstrap`) to deploy the stacks, and can sync
-  built assets to the chatbot-platform S3 buckets. No long-lived AWS keys.
+  built assets to the chatbot-platform S3 buckets. It can also tear the
+  environment down: delete its stacks and remove the retained buckets.
+  No long-lived AWS keys.
 
 Parameters:
   GitHubOrg:
@@ -70,14 +72,24 @@ Resources:
                 Effect: Allow
                 Action: sts:AssumeRole
                 Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-*
-              # Read stack outputs (bucket names) for the asset-sync step.
+              # Read stack outputs (bucket names) for the asset-sync step, and
+              # delete the stacks during a teardown. Both are scoped to this
+              # environment's ChatbotPlatform-* stacks only.
               - Sid: ReadStacks
                 Effect: Allow
                 Action:
                   - cloudformation:DescribeStacks
+                  - cloudformation:DeleteStack
                 Resource: !Sub arn:${AWS::Partition}:cloudformation:*:${AWS::AccountId}:stack/ChatbotPlatform-${EnvName}-*/*
               # Sync built widget/chat/marketing/portal assets to the buckets.
               # Bucket names are chatbot-platform-<env>-<role>-<account> (CDK).
+              #
+              # The teardown workflow also needs to empty and remove these
+              # buckets: they are RemovalPolicy.RETAIN, so `cdk destroy` leaves
+              # them orphaned, and their deterministic names then collide with
+              # the next deploy. Because they are versioned, emptying one needs
+              # ListBucketVersions + DeleteObjectVersion as well, not just
+              # DeleteObject. Still scoped to this environment's buckets.
               - Sid: SyncAssets
                 Effect: Allow
                 Action:
@@ -85,6 +97,9 @@ Resources:
                   - s3:DeleteObject
                   - s3:GetObject
                   - s3:ListBucket
+                  - s3:ListBucketVersions
+                  - s3:DeleteObjectVersion
+                  - s3:DeleteBucket
                 Resource:
                   - !Sub arn:${AWS::Partition}:s3:::chatbot-platform-${EnvName}-*-${AWS::AccountId}
                   - !Sub arn:${AWS::Partition}:s3:::chatbot-platform-${EnvName}-*-${AWS::AccountId}/*
