@@ -31,19 +31,24 @@ permissions:
 jobs:
   destroy:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.env }}
+    # `github.event.inputs` — NOT `inputs` — for a workflow_dispatch. The job
+    # must actually enter this environment: the deploy role's OIDC trust policy
+    # matches sub == repo:<org>/<repo>:environment:<env>, so if this resolves
+    # empty the token carries no `environment:` claim and AssumeRoleWithWebIdentity
+    # is denied. deploy.yml can use `inputs` because it is a workflow_call.
+    environment: ${{ github.event.inputs.env }}
     # Never let a destroy race a deploy for the same environment: share the
     # deploy concurrency group so one waits for the other.
     concurrency:
-      group: deploy-${{ inputs.env }}
+      group: deploy-${{ github.event.inputs.env }}
       cancel-in-progress: false
     steps:
       # Guard 1 — runs before checkout and before any credentials exist, so a
       # mistyped confirmation costs nothing.
       - name: Confirm the environment
         env:
-          ENV: ${{ inputs.env }}
-          CONFIRM: ${{ inputs.confirm }}
+          ENV: ${{ github.event.inputs.env }}
+          CONFIRM: ${{ github.event.inputs.confirm }}
         run: |
           if [ "$CONFIRM" != "$ENV" ]; then
             echo "::error::Confirmation mismatch: typed '${CONFIRM}', expected '${ENV}'. Nothing was destroyed."
@@ -74,7 +79,7 @@ jobs:
           DEV: ${{ secrets.AWS_DEPLOY_ROLE_DEV }}
           STAGING: ${{ secrets.AWS_DEPLOY_ROLE_STAGING }}
           PROD: ${{ secrets.AWS_DEPLOY_ROLE_PROD }}
-          ENV: ${{ inputs.env }}
+          ENV: ${{ github.event.inputs.env }}
         run: |
           set -euo pipefail
           case "$ENV" in
@@ -126,7 +131,7 @@ jobs:
       - name: Record retained bucket names
         id: buckets
         env:
-          ENV: ${{ inputs.env }}
+          ENV: ${{ github.event.inputs.env }}
         run: |
           set -euo pipefail
           stack="ChatbotPlatform-${ENV}-Edge"
@@ -152,7 +157,7 @@ jobs:
       - name: CDK destroy
         env:
           DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
-          ENV: ${{ inputs.env }}
+          ENV: ${{ github.event.inputs.env }}
           AWS_REGION: us-east-1
         run: pnpm --filter @platform/infra run destroy
 
@@ -216,7 +221,7 @@ jobs:
       # RETAIN by design: a teardown must never drop live customer data.
       - name: Report retained resources
         env:
-          ENV: ${{ inputs.env }}
+          ENV: ${{ github.event.inputs.env }}
         run: |
           {
             echo "### Teardown of \`${ENV}\` complete"
