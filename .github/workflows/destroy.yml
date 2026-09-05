@@ -1,0 +1,189 @@
+name: Destroy Env
+
+# Tears down every stack for one environment and cleans up the resources that
+# CloudFormation deliberately leaves behind. This is destructive and manual
+# only — there is no automatic trigger.
+#
+# Two independent guards must both pass before any AWS call is made:
+#   1. `confirm` must exactly equal the chosen `env` (catches a fat-fingered
+#      environment pick in the dispatch form).
+#   2. The job enters the matching GitHub Environment, so the deploy role's
+#      OIDC trust policy (sub = repo:<org>/<repo>:environment:<env>) and any
+#      required reviewers on that environment both apply.
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Environment to destroy.
+        required: true
+        type: choice
+        options: [dev, staging, prod]
+      confirm:
+        description: >-
+          Type the environment name exactly (dev / staging / prod) to confirm.
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    # Never let a destroy race a deploy for the same environment: share the
+    # deploy concurrency group so one waits for the other.
+    concurrency:
+      group: deploy-${{ inputs.env }}
+      cancel-in-progress: false
+    steps:
+      # Guard 1 — runs before checkout and before any credentials exist, so a
+      # mistyped confirmation costs nothing.
+      - name: Confirm the environment
+        env:
+          ENV: ${{ inputs.env }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "$ENV" ]; then
+            echo "::error::Confirmation mismatch: typed '${CONFIRM}', expected '${ENV}'. Nothing was destroyed."
+            exit 1
+          fi
+          echo "Confirmed teardown of '${ENV}'."
+
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE }}
+          aws-region: us-east-1
+
+      # Capture bucket names from the stack outputs BEFORE the stacks go away.
+      # After `cdk destroy` the outputs are gone, and the buckets (RETAIN) are
+      # orphaned with no record of their names in CloudFormation.
+      - name: Record retained bucket names
+        id: buckets
+        env:
+          ENV: ${{ inputs.env }}
+        run: |
+          set -euo pipefail
+          stack="ChatbotPlatform-${ENV}-Edge"
+          if ! aws cloudformation describe-stacks --stack-name "$stack" >/dev/null 2>&1; then
+            echo "Stack ${stack} does not exist — nothing to record."
+            echo "names=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          get() { aws cloudformation describe-stacks --stack-name "$stack" \
+            --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+
+          names=""
+          for out in WidgetBucketName ChatBucketName \
+                     MarketingBucketName PortalBucketName; do
+            name="$(get "$out")"
+            if [ -n "$name" ] && [ "$name" != "None" ]; then
+              echo "  ${out} = ${name}"
+              names="${names}${name} "
+            fi
+          done
+          echo "names=${names}" >> "$GITHUB_OUTPUT"
+
+      - name: CDK destroy
+        env:
+          DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
+          ENV: ${{ inputs.env }}
+          AWS_REGION: us-east-1
+        run: pnpm --filter @platform/infra run destroy
+
+      # The Edge buckets are RemovalPolicy.RETAIN + autoDeleteObjects:false in
+      # every environment, so `cdk destroy` leaves them behind, still billable.
+      # Their names are deterministic
+      # (chatbot-platform-<env>-<role>-<account>), so an orphan also collides
+      # with the next deploy of the same environment. Empty and delete them.
+      #
+      # The buckets are versioned: deleting only the current objects leaves
+      # noncurrent versions and delete markers behind, and a bucket holding
+      # those cannot be deleted. `s3api delete-objects` over
+      # list-object-versions removes both, paginating until the bucket is empty.
+      - name: Empty and delete retained buckets
+        env:
+          NAMES: ${{ steps.buckets.outputs.names }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NAMES// /}" ]; then
+            echo "No retained buckets recorded — skipping."
+            exit 0
+          fi
+
+          purge() {
+            local bucket="$1"
+            # One page (1000 keys) at a time; loop until no versions remain.
+            while :; do
+              local payload
+              # --max-keys is the server-side page size; unlike --max-items it
+              # does not make the CLI emit pagination tokens. No token is needed
+              # here because each pass deletes what it listed and then re-lists
+              # the bucket from the start.
+              payload=$(aws s3api list-object-versions --bucket "$bucket" \
+                --max-keys 1000 \
+                --query '{Objects: (([Versions, DeleteMarkers][] || [])[].{Key: Key, VersionId: VersionId})}' \
+                --output json)
+              local count
+              count=$(echo "$payload" | jq '.Objects | length')
+              [ "$count" = "0" ] && break
+              echo "  deleting ${count} object version(s) from ${bucket}"
+              echo "$payload" | jq -c '{Objects: .Objects, Quiet: true}' \
+                > /tmp/delete.json
+              aws s3api delete-objects --bucket "$bucket" \
+                --delete file:///tmp/delete.json >/dev/null
+            done
+          }
+
+          for bucket in $NAMES; do
+            if ! aws s3api head-bucket --bucket "$bucket" 2>/dev/null; then
+              echo "Bucket ${bucket} already gone — skipping."
+              continue
+            fi
+            echo "Emptying ${bucket}"
+            purge "$bucket"
+            echo "Deleting ${bucket}"
+            aws s3api delete-bucket --bucket "$bucket"
+          done
+
+      # Report what is deliberately still standing, so the operator does not
+      # assume the account is clean. In prod the table / user pool / secret are
+      # RETAIN by design: a teardown must never drop live customer data.
+      - name: Report retained resources
+        env:
+          ENV: ${{ inputs.env }}
+        run: |
+          {
+            echo "### Teardown of \`${ENV}\` complete"
+            echo
+            echo "Destroyed: Data, Api, Edge and Observability stacks."
+            echo "Deleted: the four retained S3 buckets (all object versions)."
+            echo
+            if [ "$ENV" = "prod" ]; then
+              echo "**Left in place on purpose (prod \`RemovalPolicy.RETAIN\`):**"
+              echo
+              echo "- the DynamoDB table"
+              echo "- the Cognito user pool"
+              echo "- the \`chatbot-platform-prod/model-api-key\` secret"
+              echo
+              echo "These hold live data and are never deleted by this workflow."
+              echo "Remove them by hand if that is genuinely what you want."
+            else
+              echo "No resources were retained: in \`${ENV}\` the table, user pool"
+              echo "and secret are \`RemovalPolicy.DESTROY\` and went with the stacks."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
