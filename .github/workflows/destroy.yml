@@ -64,9 +64,36 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # The deploy role is stored per environment as AWS_DEPLOY_ROLE_<ENV>.
+      # deploy.yml receives it as a reusable-workflow secret input named
+      # AWS_DEPLOY_ROLE; this workflow is dispatched directly, so there is no
+      # caller to do that mapping and it must pick the right secret itself.
+      - name: Select the deploy role for this environment
+        id: role
+        env:
+          DEV: ${{ secrets.AWS_DEPLOY_ROLE_DEV }}
+          STAGING: ${{ secrets.AWS_DEPLOY_ROLE_STAGING }}
+          PROD: ${{ secrets.AWS_DEPLOY_ROLE_PROD }}
+          ENV: ${{ inputs.env }}
+        run: |
+          set -euo pipefail
+          case "$ENV" in
+            dev) arn="$DEV" ;;
+            staging) arn="$STAGING" ;;
+            prod) arn="$PROD" ;;
+            *) echo "::error::Unknown environment '${ENV}'."; exit 1 ;;
+          esac
+          if [ -z "$arn" ]; then
+            echo "::error::Secret AWS_DEPLOY_ROLE_$(echo "$ENV" | tr '[:lower:]' '[:upper:]') is not set. Add the role ARN from the github-deploy-role stack output."
+            exit 1
+          fi
+          # The ARN is not a secret, but masking keeps the account id out of logs.
+          echo "::add-mask::${arn}"
+          echo "arn=${arn}" >> "$GITHUB_OUTPUT"
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE }}
+          role-to-assume: ${{ steps.role.outputs.arn }}
           aws-region: us-east-1
 
       # Capture bucket names from the stack outputs BEFORE the stacks go away.
